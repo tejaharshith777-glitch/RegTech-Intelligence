@@ -1,32 +1,49 @@
 %PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> endobj
-4 0 obj << /Length 610 >> stream
-BT
-/F1 12 Tf
-50 720 Td
-(FinCEN BSA RULEMAKING: TRAVEL RULE COMPLIANCE FOR VIRTUAL FUNDS) Tj
-0 -24 Td
-(Compliance Certifier: Rebecca Lin (SSN: 000-88-7654, Passport: USA-A89213401)) Tj
-0 -24 Td
-(POLICY MANDATES & REGULATORY UPDATES:) Tj
-0 -18 Td
-([1] Funds transmittal recordkeeping threshold lowered from $3,000 to $250 for cross-border transactions.) Tj
-0 -18 Td
-([2] Originator and beneficiary legal entity identifiers must be validated against real-time OFAC sanctions lists.) Tj
-0 -18 Td
-([3] Suspicious Activity Reports (SARs) must be retained with full transactional telemetry for minimum 7 years.) Tj
-ET
-endstream endobj
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 972 >>
+stream
+BT /F2 12 Tf 50 720 Td (FinCEN BSA RULEMAKING: TRAVEL RULE COMPLIANCE FOR VIRTUAL FUNDS) Tj ET
+BT /F1 11 Tf 50 704 Td ( ) Tj ET
+BT /F1 11 Tf 50 689 Td (Compliance Certifier: Rebecca Lin \(SSN: 000-88-7654, Passport: USA-A89213401\)) Tj ET
+BT /F1 11 Tf 50 674 Td ( ) Tj ET
+BT /F2 11 Tf 50 659 Td (POLICY MANDATES & REGULATORY UPDATES:) Tj ET
+BT /F1 11 Tf 50 644 Td ([1] Funds transmittal recordkeeping threshold lowered from $3,000 to $250 for ) Tj ET
+BT /F1 11 Tf 50 629 Td (    cross-border transactions.) Tj ET
+BT /F1 11 Tf 50 614 Td ( ) Tj ET
+BT /F1 11 Tf 50 606 Td ([2] Originator and beneficiary legal entity identifiers must be validated ) Tj ET
+BT /F1 11 Tf 50 591 Td (    against real-time OFAC sanctions lists.) Tj ET
+BT /F1 11 Tf 50 576 Td ( ) Tj ET
+BT /F1 11 Tf 50 568 Td ([3] Suspicious Activity Reports \(SARs\) must be retained with full transactional ) Tj ET
+BT /F1 11 Tf 50 553 Td (    telemetry for minimum 7 years.) Tj ET
+BT /F1 11 Tf 50 538 Td ( ) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
 xref
-0 5
+0 7
 0000000000 65535 f 
 0000000009 00000 n 
 0000000058 00000 n 
 0000000115 00000 n 
-0000000214 00000 n 
-trailer << /Root 1 0 R /Size 5 >>
+0000000251 00000 n 
+0000001274 00000 n 
+0000001371 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
 startxref
-884
+1473
 %%EOF

@@ -1,32 +1,49 @@
 %PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> endobj
-4 0 obj << /Length 586 >> stream
-BT
-/F1 12 Tf
-50 720 Td
-(EU GDPR ENFORCEMENT MEMORANDUM: ARTICLE 46 AUDIT GUIDANCE) Tj
-0 -24 Td
-(Lead Examiner: Elena Rostova (Phone: +44 20 7946 0912, Passport: GBR-90823412)) Tj
-0 -24 Td
-(POLICY MANDATES & REGULATORY UPDATES:) Tj
-0 -18 Td
-([1] Standard Contractual Clauses (SCCs) must include supplementary encryption key escrow restrictions.) Tj
-0 -18 Td
-([2] Data exporters must conduct documented Transfer Impact Assessments (TIAs) annually.) Tj
-0 -18 Td
-([3] Direct government intelligence access requests require mandatory notice to supervisory authorities within 24 hours.) Tj
-ET
-endstream endobj
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 950 >>
+stream
+BT /F2 12 Tf 50 720 Td (EU GDPR ENFORCEMENT MEMORANDUM: ARTICLE 46 AUDIT GUIDANCE) Tj ET
+BT /F1 11 Tf 50 704 Td ( ) Tj ET
+BT /F1 11 Tf 50 689 Td (Lead Examiner: Elena Rostova \(Phone: +44 20 7946 0912, Passport: GBR-90823412\)) Tj ET
+BT /F1 11 Tf 50 674 Td ( ) Tj ET
+BT /F2 11 Tf 50 659 Td (POLICY MANDATES & REGULATORY UPDATES:) Tj ET
+BT /F1 11 Tf 50 644 Td ([1] Standard Contractual Clauses \(SCCs\) must include supplementary encryption ) Tj ET
+BT /F1 11 Tf 50 629 Td (    key escrow restrictions.) Tj ET
+BT /F1 11 Tf 50 614 Td ( ) Tj ET
+BT /F1 11 Tf 50 606 Td ([2] Data exporters must conduct documented Transfer Impact Assessments \(TIAs\) ) Tj ET
+BT /F1 11 Tf 50 591 Td (    annually.) Tj ET
+BT /F1 11 Tf 50 576 Td ( ) Tj ET
+BT /F1 11 Tf 50 568 Td ([3] Direct government intelligence access requests require mandatory notice to ) Tj ET
+BT /F1 11 Tf 50 553 Td (    supervisory authorities within 24 hours.) Tj ET
+BT /F1 11 Tf 50 538 Td ( ) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
 xref
-0 5
+0 7
 0000000000 65535 f 
 0000000009 00000 n 
 0000000058 00000 n 
 0000000115 00000 n 
-0000000214 00000 n 
-trailer << /Root 1 0 R /Size 5 >>
+0000000251 00000 n 
+0000001252 00000 n 
+0000001349 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
 startxref
-860
+1451
 %%EOF

@@ -1,32 +1,50 @@
 %PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> endobj
-4 0 obj << /Length 638 >> stream
-BT
-/F1 12 Tf
-50 720 Td
-(HHS HIPAA SECURITY AMENDMENT: MANDATORY ePHI ENCRYPTION STANDARDS) Tj
-0 -24 Td
-(Privacy Liaison: David K. Miller (DOB: 1982-04-15, Address: 742 Evergreen Terrace, Seattle, WA)) Tj
-0 -24 Td
-(POLICY MANDATES & REGULATORY UPDATES:) Tj
-0 -18 Td
-([1] Covered entities must implement phishing-resistant hardware MFA for all administrative ePHI systems.) Tj
-0 -18 Td
-([2] Cybersecurity breach incident disclosures must be filed with HHS OCR within 72 hours of initial discovery.) Tj
-0 -18 Td
-([3] Legacy clinical databases containing patient social security numbers must be de-identified or encrypted with AES-256.) Tj
-ET
-endstream endobj
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1030 >>
+stream
+BT /F2 12 Tf 50 720 Td (HHS HIPAA SECURITY AMENDMENT: MANDATORY ePHI ENCRYPTION STANDARDS) Tj ET
+BT /F1 11 Tf 50 704 Td ( ) Tj ET
+BT /F1 11 Tf 50 689 Td (Privacy Liaison: David K. Miller \(DOB: 1982-04-15, Address: 742 Evergreen ) Tj ET
+BT /F1 11 Tf 50 674 Td (Terrace, Seattle, WA\)) Tj ET
+BT /F1 11 Tf 50 659 Td ( ) Tj ET
+BT /F2 11 Tf 50 644 Td (POLICY MANDATES & REGULATORY UPDATES:) Tj ET
+BT /F1 11 Tf 50 629 Td ([1] Covered entities must implement phishing-resistant hardware MFA for all ) Tj ET
+BT /F1 11 Tf 50 614 Td (    administrative ePHI systems.) Tj ET
+BT /F1 11 Tf 50 599 Td ( ) Tj ET
+BT /F1 11 Tf 50 591 Td ([2] Cybersecurity breach incident disclosures must be filed with HHS OCR within ) Tj ET
+BT /F1 11 Tf 50 576 Td (    72 hours of initial discovery.) Tj ET
+BT /F1 11 Tf 50 561 Td ( ) Tj ET
+BT /F1 11 Tf 50 553 Td ([3] Legacy clinical databases containing patient social security numbers must be ) Tj ET
+BT /F1 11 Tf 50 538 Td (    de-identified or encrypted with AES-256.) Tj ET
+BT /F1 11 Tf 50 523 Td ( ) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
 xref
-0 5
+0 7
 0000000000 65535 f 
 0000000009 00000 n 
 0000000058 00000 n 
 0000000115 00000 n 
-0000000214 00000 n 
-trailer << /Root 1 0 R /Size 5 >>
+0000000251 00000 n 
+0000001333 00000 n 
+0000001430 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
 startxref
-912
+1532
 %%EOF

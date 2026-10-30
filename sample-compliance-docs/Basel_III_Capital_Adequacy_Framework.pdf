@@ -1,32 +1,50 @@
 %PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> endobj
-4 0 obj << /Length 616 >> stream
-BT
-/F1 12 Tf
-50 720 Td
-(BASEL COMMITTEE ADVISORY: CAPITAL CONSERVATION AND BUFFER CALIBRATION) Tj
-0 -24 Td
-(Risk Controller: Marcus Thorne (Tax ID: 88-9912345, Confidential Internal Extension: x4812)) Tj
-0 -24 Td
-(POLICY MANDATES & REGULATORY UPDATES:) Tj
-0 -18 Td
-([1] Tier 1 common equity ratio requirement calibrated up to 10.5% for internationally active institutions.) Tj
-0 -18 Td
-([2] Liquidity Coverage Ratio (LCR) stress tests must model extreme 30-day sovereign debt market illiquidity.) Tj
-0 -18 Td
-([3] Counterparty credit valuation adjustments (CVA) must incorporate climate risk exposure metrics.) Tj
-ET
-endstream endobj
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1012 >>
+stream
+BT /F2 12 Tf 50 720 Td (BASEL COMMITTEE ADVISORY: CAPITAL CONSERVATION AND BUFFER CALIBRATION) Tj ET
+BT /F1 11 Tf 50 704 Td ( ) Tj ET
+BT /F1 11 Tf 50 689 Td (Risk Controller: Marcus Thorne \(Tax ID: 88-9912345, Confidential Internal ) Tj ET
+BT /F1 11 Tf 50 674 Td (Extension: x4812\)) Tj ET
+BT /F1 11 Tf 50 659 Td ( ) Tj ET
+BT /F2 11 Tf 50 644 Td (POLICY MANDATES & REGULATORY UPDATES:) Tj ET
+BT /F1 11 Tf 50 629 Td ([1] Tier 1 common equity ratio requirement calibrated up to 10.5% for ) Tj ET
+BT /F1 11 Tf 50 614 Td (    internationally active institutions.) Tj ET
+BT /F1 11 Tf 50 599 Td ( ) Tj ET
+BT /F1 11 Tf 50 591 Td ([2] Liquidity Coverage Ratio \(LCR\) stress tests must model extreme 30-day ) Tj ET
+BT /F1 11 Tf 50 576 Td (    sovereign debt market illiquidity.) Tj ET
+BT /F1 11 Tf 50 561 Td ( ) Tj ET
+BT /F1 11 Tf 50 553 Td ([3] Counterparty credit valuation adjustments \(CVA\) must incorporate climate ) Tj ET
+BT /F1 11 Tf 50 538 Td (    risk exposure metrics.) Tj ET
+BT /F1 11 Tf 50 523 Td ( ) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
 xref
-0 5
+0 7
 0000000000 65535 f 
 0000000009 00000 n 
 0000000058 00000 n 
 0000000115 00000 n 
-0000000214 00000 n 
-trailer << /Root 1 0 R /Size 5 >>
+0000000251 00000 n 
+0000001315 00000 n 
+0000001412 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
 startxref
-890
+1514
 %%EOF

@@ -66,40 +66,102 @@ const sampleDocs = [
   }
 ];
 
+/**
+ * Wrap one line of text so it stays inside the printable area.
+ *
+ * The page is 612pt wide with 50pt margins, and the extractor joins text-show
+ * operators with no separator - so every wrapped line keeps its trailing space.
+ * Without that, "stress " + "audits" would extract as "stressaudits" and the
+ * clause provenance check would fail on a document that looks perfectly fine.
+ */
+const MAX_CHARS = 80;
+
+function wrapText(text, maxChars = MAX_CHARS) {
+  const words = String(text).split(' ');
+  const lines = [];
+  let current = '';
+
+  for (const word of words) {
+    if (!current) {
+      current = word;
+    } else if (current.length + 1 + word.length <= maxChars) {
+      current += ' ' + word;
+    } else {
+      lines.push(current + ' '); // keep the space: see note above
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+/** Escape the three characters that are special inside a PDF string literal. */
+const pdfEscape = (text) =>
+  String(text).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+
 function buildPdfBuffer(doc) {
-  const streamContent = `BT
-/F1 12 Tf
-50 720 Td
-(${doc.title}) Tj
-0 -24 Td
-(${doc.piiText}) Tj
-0 -24 Td
-(POLICY MANDATES & REGULATORY UPDATES:) Tj
-${doc.policies.map((p, idx) => `0 -18 Td\n([${idx + 1}] ${p}) Tj`).join('\n')}
-ET`;
+  // ── Lay the page out first, then serialise ────────────────────────────────
+  // Each entry is one rendered line with absolute baseline positioning, so a
+  // long clause wraps instead of running off the right edge of the page.
+  const lines = [];
+  let y = 720;
 
-  const streamLen = Buffer.byteLength(streamContent, 'utf-8');
+  const add = (text, { bold = false, size = 11, leading = 15 } = {}) => {
+    lines.push({ text, bold, size, y });
+    y -= leading;
+  };
 
-  const pdfBody = `%PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> endobj
-4 0 obj << /Length ${streamLen} >> stream
-${streamContent}
-endstream endobj
-xref
-0 5
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000214 00000 n 
-trailer << /Root 1 0 R /Size 5 >>
-startxref
-${214 + 60 + streamLen}
-%%EOF`;
+  wrapText(doc.title, 74).forEach((line) => add(line, { bold: true, size: 12, leading: 16 }));
+  add(' ');
+  wrapText(doc.piiText).forEach((line) => add(line));
+  add(' ');
+  add('POLICY MANDATES & REGULATORY UPDATES:', { bold: true });
 
-  return Buffer.from(pdfBody, 'utf-8');
+  doc.policies.forEach((policy, idx) => {
+    const prefix = `[${idx + 1}] `;
+    const wrapped = wrapText(policy, MAX_CHARS - prefix.length);
+    // Hanging indent so continuation lines stay visually subordinate.
+    wrapped.forEach((line, i) => add(i === 0 ? prefix + line : '    ' + line));
+    add(' ', { leading: 8 });
+  });
+
+  const streamContent = lines
+    .map(
+      (l) =>
+        `BT /${l.bold ? 'F2' : 'F1'} ${l.size} Tf 50 ${l.y} Td (${pdfEscape(l.text)}) Tj ET`
+    )
+    .join('\n');
+
+  // ── Objects ──────────────────────────────────────────────────────────────
+  // /Resources and the /Font dictionaries are mandatory: without them /F1 is
+  // undefined and viewers render a blank page.
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] ' +
+      '/Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${Buffer.byteLength(streamContent, 'utf-8')} >>\nstream\n${streamContent}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>',
+  ];
+
+  // ── Serialise with byte-accurate xref offsets ────────────────────────────
+  let out = '%PDF-1.4\n';
+  const offsets = [];
+
+  objects.forEach((body, i) => {
+    offsets.push(Buffer.byteLength(out, 'utf-8'));
+    out += `${i + 1} 0 obj\n${body}\nendobj\n`;
+  });
+
+  const xrefStart = Buffer.byteLength(out, 'utf-8');
+  out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.forEach((off) => {
+    out += `${String(off).padStart(10, '0')} 00000 n \n`;
+  });
+  out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF\n`;
+
+  return Buffer.from(out, 'utf-8');
 }
 
 const outDir = path.join(__dirname, '..', 'sample-compliance-docs');

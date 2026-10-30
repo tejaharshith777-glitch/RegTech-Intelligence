@@ -1,32 +1,50 @@
 %PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> endobj
-4 0 obj << /Length 593 >> stream
-BT
-/F1 12 Tf
-50 720 Td
-(SEC SPECIAL DIRECTIVE 2026-D: QUALIFIED CUSTODY STANDARDS) Tj
-0 -24 Td
-(Audited by: Sarah Jenkins (Email: sjenkins@sec-review.gov, Direct Line: 202-551-8900)) Tj
-0 -24 Td
-(POLICY MANDATES & REGULATORY UPDATES:) Tj
-0 -18 Td
-([1] Digital asset custodians must maintain 100% segregated cold storage reserves at all times.) Tj
-0 -18 Td
-([2] Registered investment advisers are prohibited from engaging non-qualified foreign custodial entities.) Tj
-0 -18 Td
-([3] Daily cryptographic proof-of-reserve attestation certificates must be submitted to the Commission portal.) Tj
-ET
-endstream endobj
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 985 >>
+stream
+BT /F2 12 Tf 50 720 Td (SEC SPECIAL DIRECTIVE 2026-D: QUALIFIED CUSTODY STANDARDS) Tj ET
+BT /F1 11 Tf 50 704 Td ( ) Tj ET
+BT /F1 11 Tf 50 689 Td (Audited by: Sarah Jenkins \(Email: sjenkins@sec-review.gov, Direct Line: ) Tj ET
+BT /F1 11 Tf 50 674 Td (202-551-8900\)) Tj ET
+BT /F1 11 Tf 50 659 Td ( ) Tj ET
+BT /F2 11 Tf 50 644 Td (POLICY MANDATES & REGULATORY UPDATES:) Tj ET
+BT /F1 11 Tf 50 629 Td ([1] Digital asset custodians must maintain 100% segregated cold storage reserves ) Tj ET
+BT /F1 11 Tf 50 614 Td (    at all times.) Tj ET
+BT /F1 11 Tf 50 599 Td ( ) Tj ET
+BT /F1 11 Tf 50 591 Td ([2] Registered investment advisers are prohibited from engaging non-qualified ) Tj ET
+BT /F1 11 Tf 50 576 Td (    foreign custodial entities.) Tj ET
+BT /F1 11 Tf 50 561 Td ( ) Tj ET
+BT /F1 11 Tf 50 553 Td ([3] Daily cryptographic proof-of-reserve attestation certificates must be ) Tj ET
+BT /F1 11 Tf 50 538 Td (    submitted to the Commission portal.) Tj ET
+BT /F1 11 Tf 50 523 Td ( ) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
 xref
-0 5
+0 7
 0000000000 65535 f 
 0000000009 00000 n 
 0000000058 00000 n 
 0000000115 00000 n 
-0000000214 00000 n 
-trailer << /Root 1 0 R /Size 5 >>
+0000000251 00000 n 
+0000001287 00000 n 
+0000001384 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
 startxref
-867
+1486
 %%EOF

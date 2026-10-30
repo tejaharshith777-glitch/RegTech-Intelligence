@@ -1,32 +1,50 @@
 %PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> endobj
-4 0 obj << /Length 580 >> stream
-BT
-/F1 12 Tf
-50 720 Td
-(FINRA REGULATORY NOTICE 26-08: ALGORITHMIC TRADING GOVERNANCE) Tj
-0 -24 Td
-(Prepared by: Michael Vance (SSN: 111-22-3333, Email: mvance@broker-dealer.finra.org)) Tj
-0 -24 Td
-(POLICY MANDATES & REGULATORY UPDATES:) Tj
-0 -18 Td
-([1] Member firms must update customer order routing disclosures monthly on public websites.) Tj
-0 -18 Td
-([2] Supervisory procedures for algorithmic execution systems must undergo annual independent stress audits.) Tj
-0 -18 Td
-([3] Pre-trade risk controls must enforce automated kill-switches for anomalous message volume.) Tj
-ET
-endstream endobj
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 972 >>
+stream
+BT /F2 12 Tf 50 720 Td (FINRA REGULATORY NOTICE 26-08: ALGORITHMIC TRADING GOVERNANCE) Tj ET
+BT /F1 11 Tf 50 704 Td ( ) Tj ET
+BT /F1 11 Tf 50 689 Td (Prepared by: Michael Vance \(SSN: 111-22-3333, Email: ) Tj ET
+BT /F1 11 Tf 50 674 Td (mvance@broker-dealer.finra.org\)) Tj ET
+BT /F1 11 Tf 50 659 Td ( ) Tj ET
+BT /F2 11 Tf 50 644 Td (POLICY MANDATES & REGULATORY UPDATES:) Tj ET
+BT /F1 11 Tf 50 629 Td ([1] Member firms must update customer order routing disclosures monthly on ) Tj ET
+BT /F1 11 Tf 50 614 Td (    public websites.) Tj ET
+BT /F1 11 Tf 50 599 Td ( ) Tj ET
+BT /F1 11 Tf 50 591 Td ([2] Supervisory procedures for algorithmic execution systems must undergo annual ) Tj ET
+BT /F1 11 Tf 50 576 Td (    independent stress audits.) Tj ET
+BT /F1 11 Tf 50 561 Td ( ) Tj ET
+BT /F1 11 Tf 50 553 Td ([3] Pre-trade risk controls must enforce automated kill-switches for anomalous ) Tj ET
+BT /F1 11 Tf 50 538 Td (    message volume.) Tj ET
+BT /F1 11 Tf 50 523 Td ( ) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
 xref
-0 5
+0 7
 0000000000 65535 f 
 0000000009 00000 n 
 0000000058 00000 n 
 0000000115 00000 n 
-0000000214 00000 n 
-trailer << /Root 1 0 R /Size 5 >>
+0000000251 00000 n 
+0000001274 00000 n 
+0000001371 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
 startxref
-854
+1473
 %%EOF
