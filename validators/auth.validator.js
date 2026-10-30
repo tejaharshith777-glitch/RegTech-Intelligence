@@ -32,7 +32,16 @@ const registerSchema = z.object({
     })
     .optional()
     .default('researcher'),
-});
+}).strict();
+
+/**
+ * Zod schema for PATCH /api/auth/users/:id/role
+ */
+const updateRoleSchema = z.object({
+  role: z.enum(['researcher', 'admin'], {
+    error: "Role must be 'researcher' or 'admin'.",
+  }),
+}).strict();
 
 /**
  * Zod v4 schema for POST /api/auth/login
@@ -92,5 +101,6 @@ module.exports = {
   registerSchema,
   loginSchema,
   approveInsightSchema,
+  updateRoleSchema,
   validate,
 };

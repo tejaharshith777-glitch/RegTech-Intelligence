@@ -14,6 +14,7 @@ const {
 } = require('../controllers/research.controller');
 
 const { protect } = require('../middleware/auth.middleware');
+const { requireAdmin } = require('../middleware/role.middleware');
 const upload = require('../middleware/upload.middleware');
 const { approveInsightSchema, validate } = require('../validators/auth.validator');
 
@@ -56,6 +57,7 @@ router.get('/insights/:id', protect, getInsightById);
 router.put(
   '/insights/:id/approve',
   protect,
+  requireAdmin,
   validate(approveInsightSchema),
   updateInsightApproval
 );

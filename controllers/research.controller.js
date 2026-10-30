@@ -157,6 +157,7 @@ const uploadDocument = async (req, res, next) => {
 
     let geminiResult = null;
     let usedModelName = 'gemini-2.5-flash';
+    const geminiClient = getGeminiClient();
 
     for (const modelName of candidateModels) {
       try {
@@ -409,6 +410,17 @@ const verifyAuditChain = async (req, res, next) => {
       if (current.prevApprovalHash !== prevHash) {
         isValid = false;
         failureReason = `Block link mismatch at index ${i}: expected prevHash ${prevHash}, got ${current.prevApprovalHash}`;
+        break;
+      }
+
+      // Recompute hash to detect content tampering
+      const userId = current.approvedBy?.toString() || 'SYSTEM_REVIEWER';
+      const timestamp = current.approvedAt?.toISOString() || '';
+      const ledgerPayload = `${prevHash}|${current._id}|${current.humanApprovalStatus}|${userId}|${timestamp}|${current.approvalReason || ''}`;
+      const recomputed = crypto.createHash('sha256').update(ledgerPayload).digest('hex');
+      if (recomputed !== current.approvalHash) {
+        isValid = false;
+        failureReason = `Hash mismatch at block index ${i}: stored=${current.approvalHash.slice(0,12)}..., recomputed=${recomputed.slice(0,12)}...`;
         break;
       }
     }

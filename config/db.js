@@ -257,9 +257,14 @@ const connectDB = async () => {
     });
     console.log(`[db] ✅ MongoDB connected: ${conn.connection.host}`);
   } catch (error) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error(`[db] ❌ MongoDB connection failed in production: ${error.message}`);
+      process.exit(1);
+    }
     console.warn(`[db] ⚠️  MongoDB connection warning: ${error.message}`);
     setupInMemoryFallback();
   }
 };
 
 module.exports = connectDB;
+module.exports.isInMemoryFallback = () => isInMemoryFallback;

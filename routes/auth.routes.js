@@ -6,7 +6,8 @@ const rateLimit = require('express-rate-limit');
 
 const { register, login, getMe } = require('../controllers/auth.controller');
 const { protect } = require('../middleware/auth.middleware');
-const { registerSchema, loginSchema, validate } = require('../validators/auth.validator');
+const { requireAdmin } = require('../middleware/role.middleware');
+const { registerSchema, loginSchema, updateRoleSchema, validate } = require('../validators/auth.validator');
 
 // ─── Auth-specific Rate Limiter ─────────────────────────────────────────────
 const authLimiter = rateLimit({
@@ -50,5 +51,19 @@ router.post('/login', authLimiter, validate(loginSchema), login);
  *       - BearerAuth: []
  */
 router.get('/me', protect, getMe);
+
+// Update a user's role — admin only
+const User = require('../models/User.model');
+router.patch('/users/:id/role', protect, requireAdmin, validate(updateRoleSchema), async (req, res, next) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { role: req.body.role },
+      { new: true, runValidators: true }
+    ).select('-password');
+    if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+    return res.status(200).json({ success: true, data: { user } });
+  } catch (err) { return next(err); }
+});
 
 module.exports = router;

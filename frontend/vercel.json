@@ -2,11 +2,8 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://REPLACE-WITH-YOUR-RENDER-URL.onrender.com/api/$1"
+      "destination": "https://regtech-intelligence.onrender.com/api/$1"
     },
-    {
-      "source": "/((?!api).*)",
-      "destination": "/index.html"
-    }
+    { "source": "/((?!api).*)", "destination": "/index.html" }
   ]
 }

@@ -72,10 +72,12 @@ if (process.env.NODE_ENV !== 'test') {
 
 // ─── Health Check ───────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
+  const dbMode = connectDB.isInMemoryFallback ? (connectDB.isInMemoryFallback() ? 'in-memory' : 'mongodb') : 'mongodb';
   res.status(200).json({
     success: true,
     message: 'Regulatory Compliance API is running.',
     environment: process.env.NODE_ENV,
+    db: dbMode,
     timestamp: new Date().toISOString(),
   });
 });

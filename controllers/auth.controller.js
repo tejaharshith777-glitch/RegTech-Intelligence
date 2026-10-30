@@ -30,7 +30,7 @@ const generateToken = (userId) => {
  */
 const register = async (req, res, next) => {
   try {
-    const { username, email, password, role } = req.body;
+    const { username, email, password } = req.body; // ignore any client-supplied role
 
     // Check for existing user (belt-and-suspenders alongside unique index)
     const existingUser = await User.findOne({ email });
@@ -42,7 +42,12 @@ const register = async (req, res, next) => {
     }
 
     // Create user — password hashed by the pre-save hook in User.model.js
-    const user = await User.create({ username, email, password, role });
+    const user = await User.create({
+      username,
+      email,
+      password,
+      role: 'researcher', // hardcoded — the only safe default
+    });
 
     const token = generateToken(user._id.toString());
 
