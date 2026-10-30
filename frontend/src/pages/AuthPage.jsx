@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Shield, Lock, Mail, User, ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { Lock, Mail, User, ArrowRight, Loader2, ChevronLeft } from 'lucide-react';
 import { authService } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
 
-export default function AuthPage() {
+export default function AuthPage({ onBack, onSuccess }) {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const { setAuth } = useAuthStore();
@@ -31,7 +31,8 @@ export default function AuthPage() {
           password: formData.password,
         });
         setAuth(res.data.user, res.data.token);
-        toast.success(`Welcome back, ${res.data.user.username}!`);
+        toast.success(`Welcome back, ${res.data.user.username}`);
+        onSuccess?.();
       } else {
         const res = await authService.register({
           username: formData.username,
@@ -40,10 +41,10 @@ export default function AuthPage() {
           role: formData.role,
         });
         setAuth(res.data.user, res.data.token);
-        toast.success('Registration successful!');
+        toast.success('Account created successfully');
+        onSuccess?.();
       }
     } catch (err) {
-      console.error('Auth error:', err);
       const msg = err.response?.data?.message || err.message || 'Authentication failed';
       toast.error(msg);
     } finally {
@@ -58,20 +59,19 @@ export default function AuthPage() {
     try {
       const res = await authService.login({ email, password });
       setAuth(res.data.user, res.data.token);
-      toast.success(`Logged in as ${role === 'admin' ? 'Compliance Admin' : 'Compliance Researcher'}`);
-    } catch (err) {
-      // If user not registered yet, register on the fly
+      toast.success(`Signed in as ${role === 'admin' ? 'Admin' : 'Researcher'}`);
+      onSuccess?.();
+    } catch {
       try {
         const regRes = await authService.register({
           username: role === 'admin' ? 'ComplianceAdmin' : 'ComplianceResearcher',
-          email,
-          password,
-          role,
+          email, password, role,
         });
         setAuth(regRes.data.user, regRes.data.token);
-        toast.success(`Registered & logged in as ${role}`);
+        toast.success(`Created & signed in as ${role}`);
+        onSuccess?.();
       } catch (regErr) {
-        toast.error('Quick demo login failed: ' + (regErr.response?.data?.message || regErr.message));
+        toast.error('Demo login failed: ' + (regErr.response?.data?.message || regErr.message));
       }
     } finally {
       setLoading(false);
@@ -79,31 +79,41 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-[#070b14] relative overflow-hidden">
-      {/* Background Glow */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-blue-600/10 blur-[140px] pointer-events-none rounded-full" />
+    <div className="min-h-screen flex items-center justify-center p-6 bg-forge-black bg-texture relative overflow-hidden grain-overlay">
+      {/* Ambient */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-forge-accent/[0.03] blur-[140px] rounded-full pointer-events-none" />
 
-      <div className="w-full max-w-md relative z-10 space-y-6">
-        {/* Brand Header */}
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-500 flex items-center justify-center mx-auto text-white font-extrabold text-2xl shadow-xl shadow-blue-500/20">
-            §
+      <div className="w-full max-w-md relative z-10 animate-fade-in-up">
+        {/* Back */}
+        {onBack && (
+          <button onClick={onBack} className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-forge-muted hover:text-white font-sans mb-8 transition-colors">
+            <ChevronLeft className="w-3.5 h-3.5" />
+            <span>Back to Home</span>
+          </button>
+        )}
+
+        {/* Brand */}
+        <div className="text-center mb-10">
+          <div className="w-12 h-12 mx-auto border border-forge-accent/30 rounded flex items-center justify-center mb-4">
+            <span className="text-forge-accent font-serif text-2xl">§</span>
           </div>
-          <h2 className="text-2xl font-bold tracking-tight text-white">RegTech Intelligence</h2>
-          <p className="text-xs text-slate-400">
-            Automated Regulatory Auditing, PII Sanitization & Human Approval
+          <h2 className="font-serif text-3xl tracking-tight text-white mb-2">
+            {isLogin ? 'Welcome Back' : 'Join RegTech'}
+          </h2>
+          <p className="text-xs text-forge-muted font-sans">
+            Automated Regulatory Intelligence & Governance
           </p>
         </div>
 
-        {/* Auth Card */}
-        <div className="p-8 rounded-2xl bg-[#0c1322] border border-white/10 shadow-2xl backdrop-blur-xl space-y-6">
+        {/* Card */}
+        <div className="p-8 bg-forge-card border border-white/[0.06] space-y-6">
           {/* Tabs */}
-          <div className="grid grid-cols-2 p-1 bg-slate-900/80 rounded-xl border border-white/5">
+          <div className="grid grid-cols-2 border-b border-white/[0.06]">
             <button
               type="button"
               onClick={() => setIsLogin(true)}
-              className={`py-2 text-xs font-semibold rounded-lg transition-all ${
-                isLogin ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+              className={`py-3 text-[11px] uppercase tracking-[0.2em] font-sans transition-all border-b-2 ${
+                isLogin ? 'border-forge-accent text-white' : 'border-transparent text-forge-muted hover:text-white'
               }`}
             >
               Sign In
@@ -111,40 +121,35 @@ export default function AuthPage() {
             <button
               type="button"
               onClick={() => setIsLogin(false)}
-              className={`py-2 text-xs font-semibold rounded-lg transition-all ${
-                !isLogin ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+              className={`py-3 text-[11px] uppercase tracking-[0.2em] font-sans transition-all border-b-2 ${
+                !isLogin ? 'border-forge-accent text-white' : 'border-transparent text-forge-muted hover:text-white'
               }`}
             >
               Register
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {!isLogin && (
               <>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Username</label>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-[0.2em] text-forge-muted font-sans">Username</label>
                   <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <User className="w-4 h-4 text-forge-muted/50 absolute left-4 top-1/2 -translate-y-1/2" />
                     <input
-                      type="text"
-                      name="username"
-                      required
+                      type="text" name="username" required
                       placeholder="e.g. sarah_compliance"
-                      value={formData.username}
-                      onChange={handleChange}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-900/60 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                      value={formData.username} onChange={handleChange}
+                      className="w-full pl-11 pr-4 py-3 bg-forge-black border border-white/[0.08] text-sm text-white placeholder-forge-muted/40 font-sans focus:outline-none focus:border-forge-accent/40 transition-colors"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Platform Role</label>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-[0.2em] text-forge-muted font-sans">Platform Role</label>
                   <select
-                    name="role"
-                    value={formData.role}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 bg-slate-900/60 border border-white/10 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                    name="role" value={formData.role} onChange={handleChange}
+                    className="w-full px-4 py-3 bg-forge-black border border-white/[0.08] text-sm text-white/80 font-sans focus:outline-none focus:border-forge-accent/40 cursor-pointer"
                   >
                     <option value="researcher">Compliance Researcher</option>
                     <option value="admin">Chief Compliance Officer (Admin)</option>
@@ -153,79 +158,65 @@ export default function AuthPage() {
               </>
             )}
 
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Email Address</label>
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-[0.2em] text-forge-muted font-sans">Email Address</label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Mail className="w-4 h-4 text-forge-muted/50 absolute left-4 top-1/2 -translate-y-1/2" />
                 <input
-                  type="email"
-                  name="email"
-                  required
+                  type="email" name="email" required
                   placeholder="name@organization.com"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-900/60 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                  value={formData.email} onChange={handleChange}
+                  className="w-full pl-11 pr-4 py-3 bg-forge-black border border-white/[0.08] text-sm text-white placeholder-forge-muted/40 font-sans focus:outline-none focus:border-forge-accent/40 transition-colors"
                 />
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Password</label>
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-[0.2em] text-forge-muted font-sans">Password</label>
               <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Lock className="w-4 h-4 text-forge-muted/50 absolute left-4 top-1/2 -translate-y-1/2" />
                 <input
-                  type="password"
-                  name="password"
-                  required
+                  type="password" name="password" required
                   placeholder="••••••••••••"
-                  value={formData.password}
-                  onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-900/60 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                  value={formData.password} onChange={handleChange}
+                  className="w-full pl-11 pr-4 py-3 bg-forge-black border border-white/[0.08] text-sm text-white placeholder-forge-muted/40 font-sans focus:outline-none focus:border-forge-accent/40 transition-colors"
                 />
               </div>
               {!isLogin && (
-                <div className="text-[10px] text-slate-500">Min 8 characters, 1 uppercase, 1 lowercase, 1 number</div>
+                <p className="text-[10px] text-forge-muted/50 font-sans">Min 8 characters, 1 uppercase, 1 lowercase, 1 number</p>
               )}
             </div>
 
             <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/25 transition-all hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
+              type="submit" disabled={loading}
+              className="w-full flex items-center justify-center gap-3 py-4 border border-forge-accent/40 hover:border-forge-accent text-[11px] uppercase tracking-[0.2em] font-sans text-white transition-all duration-500 hover:bg-forge-accent/10 disabled:opacity-40"
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <>
-                  <span>{isLogin ? 'Sign In to Workspace' : 'Create Researcher Account'}</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <span>{isLogin ? 'Sign In to Platform' : 'Create Account'}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </>
               )}
             </button>
           </form>
 
-          {/* Quick Demo Fill Buttons */}
-          <div className="pt-4 border-t border-white/10 space-y-2.5">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 text-center flex items-center justify-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Instant One-Click Demo Access</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
+          {/* Quick Demo */}
+          <div className="pt-5 border-t border-white/[0.06]">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-forge-muted/50 font-sans text-center mb-4">Instant Demo Access</p>
+            <div className="grid grid-cols-2 gap-3">
               <button
-                type="button"
-                onClick={() => quickDemoLogin('researcher')}
-                disabled={loading}
-                className="py-2 px-3 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-slate-300 text-[11px] font-medium transition-all"
+                type="button" onClick={() => quickDemoLogin('researcher')} disabled={loading}
+                className="py-3 text-[10px] uppercase tracking-[0.15em] font-sans text-forge-muted border border-white/[0.06] hover:border-forge-accent/30 hover:text-white transition-all duration-300 disabled:opacity-40"
               >
-                Sign In as Researcher
+                Researcher
               </button>
               <button
-                type="button"
-                onClick={() => quickDemoLogin('admin')}
-                disabled={loading}
-                className="py-2 px-3 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-slate-300 text-[11px] font-medium transition-all"
+                type="button" onClick={() => quickDemoLogin('admin')} disabled={loading}
+                className="py-3 text-[10px] uppercase tracking-[0.15em] font-sans text-forge-muted border border-white/[0.06] hover:border-forge-accent/30 hover:text-white transition-all duration-300 disabled:opacity-40"
               >
-                Sign In as Admin
+                Admin
               </button>
             </div>
           </div>

@@ -49,33 +49,33 @@ export default function ReviewDrawer({ insight, isOpen, onClose, onUpdated }) {
   const getRiskBadge = (level) => {
     switch (level?.toLowerCase()) {
       case 'high':
-        return <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase bg-rose-500/15 text-rose-400 border border-rose-500/30">High Risk</span>;
+        return <span className="px-2.5 py-1 rounded-sm text-[10px] font-sans font-semibold uppercase tracking-[0.15em] bg-rose-500/10 text-rose-400 border border-rose-500/25">High Risk</span>;
       case 'medium':
-        return <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase bg-amber-500/15 text-amber-400 border border-amber-500/30">Medium Risk</span>;
+        return <span className="px-2.5 py-1 rounded-sm text-[10px] font-sans font-semibold uppercase tracking-[0.15em] bg-amber-500/10 text-amber-400 border border-amber-500/25">Medium</span>;
       default:
-        return <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">Low Risk</span>;
+        return <span className="px-2.5 py-1 rounded-sm text-[10px] font-sans font-semibold uppercase tracking-[0.15em] bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">Low Risk</span>;
     }
   };
 
   const getStatusBadge = (status) => {
     switch (status) {
       case 'Approved':
-        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">✔ Approved</span>;
+        return <span className="px-2.5 py-1 rounded-sm text-[10px] font-sans font-semibold uppercase tracking-[0.15em] bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">✔ Approved</span>;
       case 'Rejected':
-        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">✖ Rejected</span>;
+        return <span className="px-2.5 py-1 rounded-sm text-[10px] font-sans font-semibold uppercase tracking-[0.15em] bg-rose-500/10 text-rose-400 border border-rose-500/25">✖ Rejected</span>;
       default:
-        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">⏳ Pending Review</span>;
+        return <span className="px-2.5 py-1 rounded-sm text-[10px] font-sans font-semibold uppercase tracking-[0.15em] bg-amber-500/10 text-amber-400 border border-amber-500/25">⏳ Pending</span>;
     }
   };
 
   const getObligationBadge = (obligation) => {
     switch (obligation) {
       case 'MANDATORY':
-        return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30">MANDATORY</span>;
+        return <span className="px-2 py-0.5 rounded-sm text-[9px] font-mono font-bold uppercase tracking-wider bg-rose-500/15 text-rose-400 border border-rose-500/25">MANDATORY</span>;
       case 'RECOMMENDED':
-        return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">RECOMMENDED</span>;
+        return <span className="px-2 py-0.5 rounded-sm text-[9px] font-mono font-bold uppercase tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/25">RECOMMENDED</span>;
       default:
-        return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30">ADVISORY</span>;
+        return <span className="px-2 py-0.5 rounded-sm text-[9px] font-mono font-bold uppercase tracking-wider bg-white/10 text-white/80 border border-white/15">ADVISORY</span>;
     }
   };
 
@@ -83,24 +83,24 @@ export default function ReviewDrawer({ insight, isOpen, onClose, onUpdated }) {
   const pii = insight.piiAudit || { modelRedactions: insight.piiRedacted ? 3 : 0, serverRedactions: 0, residualAfterScan: 0, clean: true };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-sm animate-fadeIn flex justify-end">
-      <div className="relative w-full max-w-2xl h-full bg-[#0a0f1d] border-l border-white/10 shadow-2xl flex flex-col animate-slideLeft">
+    <div className="fixed inset-0 z-50 overflow-hidden bg-black/80 backdrop-blur-md animate-fadeIn flex justify-end">
+      <div className="relative w-full max-w-2xl h-full bg-[#0a0a0c] border-l border-white/[0.08] shadow-2xl flex flex-col animate-slideLeft">
         {/* Header */}
-        <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
+        <div className="p-6 border-b border-white/[0.06] flex items-center justify-between bg-white/[0.01]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+            <div className="w-10 h-10 rounded-sm bg-forge-accent/10 border border-forge-accent/30 flex items-center justify-center text-forge-accent">
               <FileText className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-base text-white truncate max-w-sm">
+              <h3 className="font-serif text-lg text-white truncate max-w-sm">
                 {insight.documentId?.filename || 'Regulatory Document'}
               </h3>
-              <p className="text-xs text-slate-400 font-mono">ID: {insight._id}</p>
+              <p className="text-[10px] text-forge-muted font-mono tracking-wider">ID: {insight._id}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+            className="p-2 text-forge-muted hover:text-white rounded hover:bg-white/[0.05] transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -274,12 +274,12 @@ export default function ReviewDrawer({ insight, isOpen, onClose, onUpdated }) {
             </div>
           ) : showReasonInput ? (
             <div className="space-y-3 animate-fadeIn">
-              <div className="text-xs text-slate-300 font-semibold flex items-center justify-between">
-                <span>Provide decision note for {pendingAction}:</span>
+              <div className="text-[11px] uppercase tracking-wider text-forge-muted font-sans flex items-center justify-between">
+                <span>Provide decision justification for {pendingAction}:</span>
                 <button
                   type="button"
                   onClick={() => setShowReasonInput(false)}
-                  className="text-slate-500 hover:text-slate-300 text-[11px]"
+                  className="text-forge-muted hover:text-white text-[10px] uppercase tracking-wider"
                 >
                   Cancel
                 </button>
@@ -288,18 +288,18 @@ export default function ReviewDrawer({ insight, isOpen, onClose, onUpdated }) {
                 rows={2}
                 value={decisionReason}
                 onChange={(e) => setDecisionReason(e.target.value)}
-                placeholder="Optional reviewer justification / auditor notes..."
-                className="w-full p-2.5 bg-slate-900 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                placeholder="Auditor notes & regulatory rationale..."
+                className="w-full p-3 bg-[#111114] border border-white/[0.08] rounded-sm text-xs text-white placeholder-forge-muted/40 focus:outline-none focus:border-forge-accent/50 font-sans"
               />
               <button
                 type="button"
                 disabled={loading}
                 onClick={() => handleDecision(pendingAction)}
-                className={`w-full py-2.5 rounded-xl text-xs font-semibold text-white shadow-lg flex items-center justify-center gap-2 ${
-                  pendingAction === 'Approved' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500'
+                className={`w-full py-3 rounded-sm text-[11px] uppercase tracking-[0.2em] font-sans font-semibold text-black bg-white hover:bg-forge-cream shadow-xl flex items-center justify-center gap-2 transition-all ${
+                  pendingAction === 'Approved' ? 'hover:shadow-emerald-950/30' : 'hover:shadow-rose-950/30'
                 }`}
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Confirm & Commit Ledger Block</span>}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin text-black" /> : <span>Commit Decision To Ledger</span>}
               </button>
             </div>
           ) : (
@@ -311,10 +311,10 @@ export default function ReviewDrawer({ insight, isOpen, onClose, onUpdated }) {
                   setPendingAction('Rejected');
                   setShowReasonInput(true);
                 }}
-                className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-semibold transition-all disabled:opacity-50"
+                className="flex items-center justify-center gap-2 py-3 px-4 rounded-sm bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/25 text-[11px] uppercase tracking-[0.2em] font-sans font-medium transition-all disabled:opacity-40"
               >
                 <XCircle className="w-4 h-4" />
-                <span>Reject Policy</span>
+                <span>Reject Mandate</span>
               </button>
               <button
                 type="button"
@@ -323,10 +323,10 @@ export default function ReviewDrawer({ insight, isOpen, onClose, onUpdated }) {
                   setPendingAction('Approved');
                   setShowReasonInput(true);
                 }}
-                className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 text-xs font-semibold transition-all disabled:opacity-50"
+                className="flex items-center justify-center gap-2 py-3 px-4 rounded-sm bg-white hover:bg-forge-cream text-black shadow-xl text-[11px] uppercase tracking-[0.2em] font-sans font-semibold transition-all disabled:opacity-40 hover:scale-[1.02]"
               >
                 <CheckCircle className="w-4 h-4" />
-                <span>Approve Policy</span>
+                <span>Approve Mandate</span>
               </button>
             </div>
           )}

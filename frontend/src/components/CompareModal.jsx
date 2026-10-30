@@ -48,37 +48,37 @@ export default function CompareModal({ isOpen, onClose, documents = [] }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-      <div className="relative w-full max-w-3xl bg-[#0c1322] border border-white/10 rounded-2xl shadow-2xl p-6 overflow-hidden max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl animate-fadeIn">
+      <div className="relative w-full max-w-3xl bg-[#0a0a0c] border border-white/[0.08] rounded-sm shadow-2xl p-6 md:p-8 overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-white/10 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+        <div className="flex items-center justify-between pb-5 border-b border-white/[0.06] shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-sm bg-forge-accent/10 border border-forge-accent/30 flex items-center justify-center text-forge-accent">
               <GitCompare className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="font-bold text-base text-white">Regulatory Version Diff Engine</h2>
-              <p className="text-xs text-slate-400">Track obligation additions, removals, and threshold amendments</p>
+              <h2 className="font-serif text-xl text-white tracking-wide">Regulatory Version Diff Engine</h2>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-forge-muted font-sans mt-0.5">Track obligation additions, removals, and threshold shifts</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+            className="p-1.5 text-forge-muted hover:text-white rounded hover:bg-white/[0.05] transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Document Selectors */}
-        <div className="py-4 border-b border-white/5 shrink-0 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="py-5 border-b border-white/[0.06] shrink-0 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Base Document (Version 1)
+            <label className="text-[10px] font-sans uppercase tracking-[0.2em] text-forge-muted">
+              Base Mandate (Version 1)
             </label>
             <select
               value={docA}
               onChange={(e) => setDocA(e.target.value)}
-              className="w-full p-2.5 bg-slate-900 border border-white/10 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+              className="w-full p-2.5 bg-[#111114] border border-white/[0.08] rounded-sm text-xs text-forge-cream focus:outline-none focus:border-forge-accent/50 font-sans"
             >
               <option value="">Select Document A...</option>
               {documents.map((d) => (
@@ -90,13 +90,13 @@ export default function CompareModal({ isOpen, onClose, documents = [] }) {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Target Document (Version 2)
+            <label className="text-[10px] font-sans uppercase tracking-[0.2em] text-forge-muted">
+              Target Mandate (Version 2)
             </label>
             <select
               value={docB}
               onChange={(e) => setDocB(e.target.value)}
-              className="w-full p-2.5 bg-slate-900 border border-white/10 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+              className="w-full p-2.5 bg-[#111114] border border-white/[0.08] rounded-sm text-xs text-forge-cream focus:outline-none focus:border-forge-accent/50 font-sans"
             >
               <option value="">Select Document B...</option>
               {documents.map((d) => (
@@ -230,11 +230,11 @@ export default function CompareModal({ isOpen, onClose, documents = [] }) {
         </div>
 
         {/* Footer */}
-        <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3 shrink-0">
+        <div className="pt-5 border-t border-white/[0.06] flex items-center justify-end gap-3 shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+            className="px-5 py-2.5 text-[11px] uppercase tracking-[0.2em] font-sans text-forge-muted hover:text-white transition-colors"
           >
             Close
           </button>
@@ -242,9 +242,9 @@ export default function CompareModal({ isOpen, onClose, documents = [] }) {
             type="button"
             disabled={loading || !docA || !docB}
             onClick={handleCompare}
-            className="flex items-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg shadow-lg shadow-indigo-600/25 transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-2.5 text-[11px] uppercase tracking-[0.2em] font-sans font-semibold text-black bg-white hover:bg-forge-cream rounded-sm shadow-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02]"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <GitCompare className="w-4 h-4" />}
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <GitCompare className="w-3.5 h-3.5" />}
             <span>Compare Versions</span>
           </button>
         </div>

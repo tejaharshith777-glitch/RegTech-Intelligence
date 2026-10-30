@@ -297,95 +297,95 @@ export default function UploadModal({ isOpen, onClose, onSuccess }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-      <div className="relative w-full max-w-2xl bg-[#0c1322] border border-white/10 rounded-2xl shadow-2xl p-6 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl animate-fadeIn">
+      <div className="relative w-full max-w-2xl bg-[#0a0a0c] border border-white/[0.08] rounded-sm shadow-2xl p-6 md:p-8 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-white/10">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+        <div className="flex items-center justify-between pb-5 border-b border-white/[0.06]">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-sm bg-forge-accent/10 border border-forge-accent/30 flex items-center justify-center text-forge-accent">
               <UploadCloud className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="font-bold text-base text-white">Upload Regulatory Policy (PDF)</h2>
-              <p className="text-xs text-slate-400">Automated Gemini Ingestion & Redaction Pipeline</p>
+              <h2 className="font-serif text-xl text-white tracking-wide">Ingest Regulatory Document (PDF)</h2>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-forge-muted font-sans mt-0.5">Zero-Disk Memory Pipeline · Gemini 2.5 Flash</p>
             </div>
           </div>
           <button
             onClick={handleClose}
             disabled={uploadState === 'uploading' || uploadState === 'analyzing'}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors disabled:opacity-50"
+            className="p-1.5 text-forge-muted hover:text-white rounded hover:bg-white/[0.05] transition-colors disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="py-5 space-y-5">
+        <div className="py-6 space-y-6">
           {/* Dropzone */}
           <div
             {...getRootProps()}
-            className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200 ${
+            className={`border border-dashed rounded-sm p-8 text-center cursor-pointer transition-all duration-300 ${
               isDragActive
-                ? 'border-blue-500 bg-blue-500/10 scale-[0.99]'
+                ? 'border-forge-accent bg-forge-accent/10 scale-[0.99]'
                 : isDragReject
                 ? 'border-rose-500 bg-rose-500/10'
                 : file
-                ? 'border-emerald-500/50 bg-emerald-500/5'
-                : 'border-white/15 bg-white/[0.02] hover:border-blue-500/50 hover:bg-white/[0.04]'
+                ? 'border-emerald-500/40 bg-emerald-500/5'
+                : 'border-white/15 bg-white/[0.015] hover:border-forge-accent/50 hover:bg-white/[0.03]'
             }`}
           >
             <input {...getInputProps()} />
 
             {file ? (
               <div className="flex flex-col items-center gap-2">
-                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <div className="w-12 h-12 rounded-sm bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
                   <FileCheck className="w-6 h-6" />
                 </div>
-                <div className="font-semibold text-sm text-slate-200">{file.name}</div>
-                <div className="text-xs text-slate-400">{(file.size / 1024).toFixed(1)} KB · Ready to analyze</div>
+                <div className="font-serif text-base text-white">{file.name}</div>
+                <div className="text-xs font-mono text-forge-muted">{(file.size / 1024).toFixed(1)} KB · Ingestion Buffer Ready</div>
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setFile(null);
                   }}
-                  className="mt-2 text-xs text-rose-400 hover:underline"
+                  className="mt-2 text-xs text-rose-400 hover:underline uppercase tracking-wider font-mono"
                 >
                   Change file
                 </button>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2">
-                <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                <div className="w-12 h-12 rounded-sm bg-forge-accent/10 border border-forge-accent/25 flex items-center justify-center text-forge-accent">
                   <UploadCloud className="w-6 h-6" />
                 </div>
-                <div className="font-semibold text-sm text-slate-200">
-                  {isDragActive ? 'Drop your PDF here...' : 'Click or drag & drop regulatory PDF'}
+                <div className="font-serif text-base text-white">
+                  {isDragActive ? 'Drop regulatory PDF stream...' : 'Select or drop regulatory PDF'}
                 </div>
-                <div className="text-xs text-slate-400">Supports standard compliance PDF documents up to 15 MB</div>
+                <div className="text-[11px] text-forge-muted font-sans">Complies with FIPS 140-3 in-memory zero-disk streaming standard (Up to 15 MB)</div>
               </div>
             )}
           </div>
 
           {/* Quick-Pick Pre-loaded Real Regulatory Samples */}
           <div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Or click a pre-built regulatory sample (contains simulated PII):</span>
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] font-sans text-forge-muted mb-3">
+              <Sparkles className="w-3.5 h-3.5 text-forge-accent" />
+              <span>Or choose a pre-loaded regulatory sample:</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {PRELOADED_SAMPLES.map((s, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => loadSample(s)}
                   disabled={uploadState === 'uploading' || uploadState === 'analyzing'}
-                  className="text-left p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-blue-500/30 transition-all flex items-start gap-2 text-xs group disabled:opacity-40"
+                  className="text-left p-3 rounded-sm bg-[#111114] hover:bg-[#15151a] border border-white/[0.05] hover:border-forge-accent/40 transition-all flex items-start gap-2.5 text-xs group disabled:opacity-40"
                 >
-                  <FileText className="w-4 h-4 text-blue-400 mt-0.5 shrink-0 group-hover:scale-110 transition-transform" />
+                  <FileText className="w-4 h-4 text-forge-accent mt-0.5 shrink-0 group-hover:scale-110 transition-transform" />
                   <div className="overflow-hidden">
-                    <div className="font-medium text-slate-200 truncate">{s.title}</div>
-                    <div className="text-[10px] text-slate-400">{s.type}</div>
+                    <div className="font-medium text-white/90 truncate font-sans">{s.title}</div>
+                    <div className="text-[10px] text-forge-muted font-mono">{s.type}</div>
                   </div>
                 </button>
               ))}
@@ -394,47 +394,47 @@ export default function UploadModal({ isOpen, onClose, onSuccess }) {
 
           {/* Progressive Loading State */}
           {(uploadState === 'uploading' || uploadState === 'analyzing' || uploadState === 'done') && (
-            <div className="p-4 rounded-xl bg-blue-950/30 border border-blue-500/30 space-y-3">
+            <div className="p-4 rounded-sm bg-[#0e0e12] border border-forge-accent/30 space-y-3">
               <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2 font-medium text-blue-300">
+                <div className="flex items-center gap-2 font-medium text-forge-cream">
                   {uploadState === 'done' ? (
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                   ) : (
-                    <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+                    <Loader2 className="w-4 h-4 animate-spin text-forge-accent" />
                   )}
-                  <span>{progressStage}</span>
+                  <span className="font-sans text-xs">{progressStage}</span>
                 </div>
-                <span className="text-slate-400 text-[11px] font-mono">
+                <span className="text-forge-muted text-[11px] font-mono">
                   {uploadState === 'uploading' ? '40%' : uploadState === 'analyzing' ? '85%' : '100%'}
                 </span>
               </div>
 
               {/* Progress bar */}
-              <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
                 <div
                   className={`h-full transition-all duration-700 ease-out ${
                     uploadState === 'done'
-                      ? 'w-full bg-emerald-500'
+                      ? 'w-full bg-emerald-400'
                       : uploadState === 'analyzing'
-                      ? 'w-[85%] bg-indigo-500 animate-pulse'
-                      : 'w-[40%] bg-blue-500'
+                      ? 'w-[85%] bg-forge-accent animate-pulse'
+                      : 'w-[40%] bg-white/70'
                   }`}
                 />
               </div>
 
               {/* Guardrails checklist indicator */}
-              <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-400 pt-1">
+              <div className="grid grid-cols-3 gap-2 text-[10px] font-mono text-forge-muted pt-1">
                 <div className="flex items-center gap-1 text-emerald-400">
                   <CheckCircle2 className="w-3 h-3" />
-                  <span>Base64 Streaming</span>
+                  <span>Base64 Stream</span>
                 </div>
-                <div className={`flex items-center gap-1 ${uploadState === 'analyzing' || uploadState === 'done' ? 'text-emerald-400' : 'text-slate-500'}`}>
+                <div className={`flex items-center gap-1 ${uploadState === 'analyzing' || uploadState === 'done' ? 'text-emerald-400' : 'text-forge-muted/60'}`}>
                   {uploadState === 'analyzing' ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
                   <span>PII Masking</span>
                 </div>
-                <div className={`flex items-center gap-1 ${uploadState === 'done' ? 'text-emerald-400' : 'text-slate-500'}`}>
+                <div className={`flex items-center gap-1 ${uploadState === 'done' ? 'text-emerald-400' : 'text-forge-muted/60'}`}>
                   {uploadState === 'done' ? <CheckCircle2 className="w-3 h-3" /> : <Loader2 className="w-3 h-3 opacity-40" />}
-                  <span>Risk Categorization</span>
+                  <span>Mandate Extracted</span>
                 </div>
               </div>
             </div>
@@ -442,7 +442,7 @@ export default function UploadModal({ isOpen, onClose, onSuccess }) {
 
           {/* Error Message */}
           {errorMsg && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+            <div className="flex items-center gap-2 p-3 rounded-sm bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-mono">
               <AlertTriangle className="w-4 h-4 shrink-0" />
               <span>{errorMsg}</span>
             </div>
@@ -450,12 +450,12 @@ export default function UploadModal({ isOpen, onClose, onSuccess }) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
+        <div className="flex items-center justify-end gap-3 pt-5 border-t border-white/[0.06]">
           <button
             type="button"
             onClick={handleClose}
             disabled={uploadState === 'uploading' || uploadState === 'analyzing'}
-            className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors disabled:opacity-50"
+            className="px-5 py-2.5 text-[11px] uppercase tracking-[0.2em] font-sans text-forge-muted hover:text-white transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
@@ -463,17 +463,17 @@ export default function UploadModal({ isOpen, onClose, onSuccess }) {
             type="button"
             onClick={handleUpload}
             disabled={!file || uploadState === 'uploading' || uploadState === 'analyzing'}
-            className="flex items-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-lg shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5 active:translate-y-0"
+            className="flex items-center gap-2 px-6 py-2.5 text-[11px] uppercase tracking-[0.2em] font-sans font-semibold text-black bg-white hover:bg-forge-cream rounded-sm shadow-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-100"
           >
             {uploadState === 'uploading' || uploadState === 'analyzing' ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 <span>Processing...</span>
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4" />
-                <span>Run Compliance Extraction</span>
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Run Ingestion Engine</span>
               </>
             )}
           </button>

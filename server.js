@@ -19,6 +19,9 @@ if (process.env.NODE_ENV !== 'test') {
 
 const app = express();
 
+// Render/Vercel sit behind a proxy — express-rate-limit requires this
+app.set('trust proxy', 1);
+
 // ─── Security Middleware ────────────────────────────────────────────────────
 app.use(
   helmet({
