@@ -8,15 +8,22 @@ const {
   uploadDocument,
   getInsights,
   updateInsightApproval,
+  clarifyInsight,
   getInsightById,
   compareDocuments,
   verifyAuditChain,
+  getAuditPack,
+  getObligationsCsv,
 } = require('../controllers/research.controller');
 
 const { protect } = require('../middleware/auth.middleware');
 const { requireAdmin } = require('../middleware/role.middleware');
 const upload = require('../middleware/upload.middleware');
-const { approveInsightSchema, validate } = require('../validators/auth.validator');
+const {
+  approveInsightSchema,
+  clarifyInsightSchema,
+  validate,
+} = require('../validators/auth.validator');
 
 // ─── Upload-specific Rate Limiter ──────────────────────────────────────────
 const uploadLimiter = rateLimit({
@@ -50,10 +57,18 @@ router.get('/audit/verify', protect, verifyAuditChain);
 // UPGRADE 2: Compare Two Document Versions
 router.post('/compare', protect, compareDocuments);
 
+// Evidence exports (registered before /insights/:id so the paths do not collide)
+router.get('/insights/:id/audit-pack', protect, getAuditPack);
+router.get('/insights/:id/obligations.csv', protect, getObligationsCsv);
+
 // Get Single Insight by ID
 router.get('/insights/:id', protect, getInsightById);
 
-// Approve or Reject an Insight (Human-in-the-Loop decision)
+// Ask a question about a finding. Keeps the status Pending. Any signed-in
+// user may ask; only an administrator may decide.
+router.post('/insights/:id/clarify', protect, validate(clarifyInsightSchema), clarifyInsight);
+
+// Approve or Reject an Insight — maker-checker, administrators only.
 router.put(
   '/insights/:id/approve',
   protect,

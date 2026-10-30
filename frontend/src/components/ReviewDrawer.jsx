@@ -1,220 +1,291 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  X,
-  ShieldCheck,
-  ShieldAlert,
-  CheckCircle,
-  XCircle,
-  FileText,
-  Calendar,
-  Loader2,
-  Lock,
-  ChevronDown,
-  ChevronUp,
-  Hash,
-  Clock,
-  Sparkles,
+  X, ShieldCheck, CheckCircle, XCircle, FileText, Loader2, Lock,
+  ChevronDown, ChevronUp, Hash, Clock, Fingerprint, AlertTriangle,
+  Download, Table2, HelpCircle, ShieldAlert, UserCheck,
 } from 'lucide-react';
-import { researchService } from '../services/api';
+import { researchService, errorMessage } from '../services/api';
+import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
 
+const TIERS = {
+  MANDATORY: 'text-coral border-coral/40 bg-coral/10',
+  RECOMMENDED: 'text-amber border-amber/40 bg-amber/10',
+  ADVISORY: 'text-sky border-sky/40 bg-sky/10',
+};
+
+const APPLICABILITY = {
+  APPLIES: { label: 'Applies to you', cls: 'text-mint border-mint/40 bg-mint/10' },
+  OUT_OF_SCOPE: { label: 'Out of scope', cls: 'text-forge-dim border-forge-border bg-forge-dark' },
+  UNCLEAR: { label: 'Needs judgement', cls: 'text-amber border-amber/40 bg-amber/10' },
+};
+
+/**
+ * Review drawer.
+ *
+ * Design rules baked in:
+ *  - a control the server will refuse is never rendered as enabled
+ *  - "Request clarification" is a question, not a decision: status stays Pending
+ *  - a rejection requires a reason in the UI, matching the server's 422
+ *  - decided findings show exactly who decided, when, and why
+ */
 export default function ReviewDrawer({ insight, isOpen, onClose, onUpdated }) {
-  const [loading, setLoading] = useState(false);
-  const [expandedClauseIdx, setExpandedClauseIdx] = useState(null);
-  const [decisionReason, setDecisionReason] = useState('');
-  const [showReasonInput, setShowReasonInput] = useState(false);
-  const [pendingAction, setPendingAction] = useState(null);
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
+
+  const [openClause, setOpenClause] = useState(null);
+  const [decision, setDecision] = useState(null); // 'Approved' | 'Rejected' | 'clarify'
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [exporting, setExporting] = useState('');
+
+  useEffect(() => {
+    setDecision(null);
+    setNote('');
+    setError('');
+    setOpenClause(null);
+  }, [insight?._id]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
 
   if (!isOpen || !insight) return null;
 
-  const handleDecision = async (status) => {
-    setLoading(true);
+  const obligations = insight.policyChangeSummary || [];
+  const isFinalized = insight.humanApprovalStatus !== 'Pending';
+  const pii = insight.piiAudit || { modelRedactions: 0, serverRedactions: 0, residualAfterScan: 0 };
+
+  const submit = async () => {
+    setError('');
+
+    if (decision === 'Approved' || decision === 'Rejected') {
+      if (!isAdmin) {
+        setError('Only an administrator can approve or reject a finding.');
+        return;
+      }
+      if (decision === 'Rejected' && note.trim().length < 10) {
+        setError('A rejection reason of at least 10 characters is required.');
+        return;
+      }
+    }
+    if (decision === 'clarify' && note.trim().length < 5) {
+      setError('Write the question you want answered (at least 5 characters).');
+      return;
+    }
+
+    setBusy(true);
     try {
-      const res = await researchService.approveInsight(insight._id, status, decisionReason);
-      toast.success(`Insight marked as ${status}. SHA-256 block ledger extended!`);
+      if (decision === 'clarify') {
+        await researchService.clarifyInsight(insight._id, note.trim());
+        toast.success('Clarification requested. The finding stays open.');
+      } else {
+        await researchService.approveInsight(insight._id, decision, note.trim());
+        toast.success(
+          decision === 'Approved'
+            ? 'Approved and sealed into the audit ledger'
+            : 'Rejected and sealed into the audit ledger'
+        );
+      }
       onUpdated?.();
-      onClose();
+      onClose?.();
     } catch (err) {
-      console.error('Approval failed:', err);
-      const msg = err.response?.data?.message || err.message || 'Action failed';
+      const msg = errorMessage(err);
+      setError(msg);
       toast.error(msg);
     } finally {
-      setLoading(false);
-      setShowReasonInput(false);
-      setDecisionReason('');
-      setPendingAction(null);
+      setBusy(false);
     }
   };
 
-  const getRiskBadge = (level) => {
-    switch (level?.toLowerCase()) {
-      case 'high':
-        return <span className="px-2.5 py-1 rounded-sm text-[10px] font-sans font-semibold uppercase tracking-[0.15em] bg-rose-500/10 text-rose-400 border border-rose-500/25">High Risk</span>;
-      case 'medium':
-        return <span className="px-2.5 py-1 rounded-sm text-[10px] font-sans font-semibold uppercase tracking-[0.15em] bg-amber-500/10 text-amber-400 border border-amber-500/25">Medium</span>;
-      default:
-        return <span className="px-2.5 py-1 rounded-sm text-[10px] font-sans font-semibold uppercase tracking-[0.15em] bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">Low Risk</span>;
+  const doExport = async (kind) => {
+    setExporting(kind);
+    try {
+      if (kind === 'pack') await researchService.downloadAuditPack(insight._id);
+      else await researchService.downloadObligationsCsv(insight._id);
+      toast.success('Download started');
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setExporting('');
     }
   };
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'Approved':
-        return <span className="px-2.5 py-1 rounded-sm text-[10px] font-sans font-semibold uppercase tracking-[0.15em] bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">✔ Approved</span>;
-      case 'Rejected':
-        return <span className="px-2.5 py-1 rounded-sm text-[10px] font-sans font-semibold uppercase tracking-[0.15em] bg-rose-500/10 text-rose-400 border border-rose-500/25">✖ Rejected</span>;
-      default:
-        return <span className="px-2.5 py-1 rounded-sm text-[10px] font-sans font-semibold uppercase tracking-[0.15em] bg-amber-500/10 text-amber-400 border border-amber-500/25">⏳ Pending</span>;
-    }
-  };
-
-  const getObligationBadge = (obligation) => {
-    switch (obligation) {
-      case 'MANDATORY':
-        return <span className="px-2 py-0.5 rounded-sm text-[9px] font-mono font-bold uppercase tracking-wider bg-rose-500/15 text-rose-400 border border-rose-500/25">MANDATORY</span>;
-      case 'RECOMMENDED':
-        return <span className="px-2 py-0.5 rounded-sm text-[9px] font-mono font-bold uppercase tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/25">RECOMMENDED</span>;
-      default:
-        return <span className="px-2 py-0.5 rounded-sm text-[9px] font-mono font-bold uppercase tracking-wider bg-white/10 text-white/80 border border-white/15">ADVISORY</span>;
-    }
-  };
-
-  const isFinalized = insight.humanApprovalStatus !== 'Pending';
-  const pii = insight.piiAudit || { modelRedactions: insight.piiRedacted ? 3 : 0, serverRedactions: 0, residualAfterScan: 0, clean: true };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-black/80 backdrop-blur-md animate-fadeIn flex justify-end">
-      <div className="relative w-full max-w-2xl h-full bg-[#0a0a0c] border-l border-white/[0.08] shadow-2xl flex flex-col animate-slideLeft">
+    <div
+      className="fixed inset-0 z-[70] bg-black/75 backdrop-blur-sm flex justify-end"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Review finding"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
+      <div className="w-full max-w-2xl h-full bg-forge-dark border-l border-forge-border flex flex-col animate-slide-left" style={{ borderColor: '#252a3a' }}>
         {/* Header */}
-        <div className="p-6 border-b border-white/[0.06] flex items-center justify-between bg-white/[0.01]">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-sm bg-forge-accent/10 border border-forge-accent/30 flex items-center justify-center text-forge-accent">
-              <FileText className="w-5 h-5" />
+        <div className="p-5 border-b border-forge-border flex items-start justify-between gap-4" style={{ borderColor: '#252a3a' }}>
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-10 h-10 rounded bg-forge-accent/10 border border-forge-accent/30 flex items-center justify-center shrink-0">
+              <FileText className="w-4 h-4 text-forge-accent" />
             </div>
-            <div>
-              <h3 className="font-serif text-lg text-white truncate max-w-sm">
-                {insight.documentId?.filename || 'Regulatory Document'}
-              </h3>
-              <p className="text-[10px] text-forge-muted font-mono tracking-wider">ID: {insight._id}</p>
+            <div className="min-w-0">
+              <h2 className="font-serif text-lg text-forge-cream truncate">
+                {insight.documentId?.filename || 'Regulatory circular'}
+              </h2>
+              <p className="text-3xs font-mono text-forge-dim mt-0.5 truncate">{insight._id}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-forge-muted hover:text-white rounded hover:bg-white/[0.05] transition-colors"
+            className="p-2 rounded text-forge-dim hover:text-forge-text hover:bg-white/5 transition-colors"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Metadata Grid */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-1.5">
-                Risk Classification
-              </span>
-              <div>{getRiskBadge(insight.riskLevel)}</div>
-            </div>
-            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-1.5">
-                Approval Lifecycle
-              </span>
-              <div>{getStatusBadge(insight.humanApprovalStatus)}</div>
-            </div>
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* Status strip */}
+          <div className="grid grid-cols-3 gap-2">
+            <Meta label="Risk" value={insight.riskLevel || 'Low'} />
+            <Meta label="Decision" value={insight.humanApprovalStatus} />
+            <Meta label="Obligations" value={String(obligations.length)} />
           </div>
 
-          {/* UPGRADE 3: Deterministic PII Proof Banner */}
-          <div className="p-4 rounded-xl border bg-emerald-500/[0.06] border-emerald-500/30 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 font-semibold text-xs text-emerald-300">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Deterministic PII Proof (Dual-Pass Guardrail)</span>
+          {/* PII proof */}
+          <div className="p-4 rounded-lg bg-mint/[0.06] border border-mint/25">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2 text-xs font-medium text-mint">
+                <ShieldCheck className="w-4 h-4" />
+                Deterministic PII guard
               </div>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                Residual Scan: 0
+              <span className="text-3xs font-mono text-mint px-2 py-0.5 rounded bg-mint/15 border border-mint/30">
+                residual {pii.residualAfterScan ?? 0}
               </span>
             </div>
-
-            {/* Redaction Metrics Badge */}
-            <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 flex items-center justify-between text-xs font-mono text-slate-300">
-              <span>PII Redacted:</span>
-              <span className="text-emerald-400 font-semibold">
-                Model: {pii.modelRedactions} + Server: {pii.serverRedactions} · Residual: {pii.residualAfterScan}
-              </span>
-            </div>
-
-            <p className="text-[11px] text-slate-400 italic">
-              "We don't trust the model's promise alone. We scan its output deterministically after it runs to guarantee zero identifier leakage."
+            <p className="text-xs text-forge-muted leading-relaxed">
+              The model is asked to redact identifiers. After it runs, a regex scan checks its
+              output again — model redactions: {pii.modelRedactions ?? 0}, server redactions:{' '}
+              {pii.serverRedactions ?? 0}.
             </p>
           </div>
 
-          {/* UPGRADE 1: Extracted Obligations with Provenance Receipts */}
+          {/* Obligations */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                <span>Regulatory Obligations with Provenance</span>
-              </h4>
-              <span className="text-xs font-mono text-blue-400">
-                {insight.policyChangeSummary?.length || 0} Mandates
-              </span>
+              <h3 className="text-2xs uppercase tracking-[0.16em] text-forge-dim">
+                Obligations &amp; provenance
+              </h3>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => doExport('csv')}
+                  disabled={exporting === 'csv'}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded border border-forge-border text-3xs uppercase tracking-[0.1em] text-forge-dim hover:text-forge-text transition-colors disabled:opacity-50"
+                  style={{ borderColor: '#252a3a' }}
+                >
+                  {exporting === 'csv' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Table2 className="w-3 h-3" />} CSV
+                </button>
+                <button
+                  onClick={() => doExport('pack')}
+                  disabled={exporting === 'pack'}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded border border-forge-border text-3xs uppercase tracking-[0.1em] text-forge-dim hover:text-forge-text transition-colors disabled:opacity-50"
+                  style={{ borderColor: '#252a3a' }}
+                >
+                  {exporting === 'pack' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} Pack
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-3">
-              {insight.policyChangeSummary?.map((policy, idx) => {
-                const isObj = typeof policy === 'object';
-                const changeText = isObj ? policy.change : policy;
-                const pageNum = isObj ? policy.page || 1 : 1;
-                const clause = isObj ? policy.verbatimClause : null;
-                const obligation = isObj ? policy.obligation || 'MANDATORY' : 'MANDATORY';
-                const deadline = isObj ? policy.deadline : null;
-                const isExpanded = expandedClauseIdx === idx;
+            <div className="space-y-2.5">
+              {obligations.map((ob, idx) => {
+                const expanded = openClause === idx;
+                const app = APPLICABILITY[ob.applicability] || APPLICABILITY.UNCLEAR;
 
                 return (
-                  <div
-                    key={idx}
-                    className="rounded-xl bg-white/[0.02] border border-white/10 hover:border-white/20 transition-all overflow-hidden"
-                  >
-                    {/* Header */}
-                    <div
-                      onClick={() => setExpandedClauseIdx(isExpanded ? null : idx)}
-                      className="p-4 cursor-pointer flex items-start justify-between gap-3"
+                  <div key={idx} className="rounded-lg bg-forge-card border border-forge-border overflow-hidden" style={{ borderColor: '#252a3a' }}>
+                    <button
+                      onClick={() => setOpenClause(expanded ? null : idx)}
+                      className="w-full text-left p-4"
+                      aria-expanded={expanded}
                     >
-                      <div className="space-y-1.5 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {getObligationBadge(obligation)}
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-slate-800 text-slate-300 border border-white/5">
-                            p. {pageNum}
+                      <div className="flex items-center gap-2 flex-wrap mb-2">
+                        <span className={`px-1.5 py-0.5 rounded border text-3xs font-mono uppercase ${TIERS[ob.obligation] || TIERS.MANDATORY}`}>
+                          {ob.obligation || 'MANDATORY'}
+                        </span>
+                        <span className={`px-1.5 py-0.5 rounded border text-3xs uppercase tracking-[0.1em] ${app.cls}`}>
+                          {app.label}
+                        </span>
+                        {ob.verbatimClause ? (
+                          <span className="flex items-center gap-1 text-3xs font-mono text-mint">
+                            <Fingerprint className="w-3 h-3" /> p.{ob.page} verified
                           </span>
-                          {deadline && (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono text-amber-300 bg-amber-500/10 flex items-center gap-1">
-                              <Clock className="w-3 h-3" /> {deadline}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-slate-200 font-medium leading-relaxed">
-                          {changeText}
-                        </div>
+                        ) : (
+                          <span className="flex items-center gap-1 text-3xs font-mono text-amber">
+                            <AlertTriangle className="w-3 h-3" /> no verifiable clause
+                          </span>
+                        )}
+                        {ob.deadline && (
+                          <span className="flex items-center gap-1 text-3xs font-mono text-amber">
+                            <Clock className="w-3 h-3" /> {ob.deadline}
+                          </span>
+                        )}
                       </div>
-                      <button
-                        type="button"
-                        className="text-slate-400 hover:text-white p-1 rounded hover:bg-white/5 shrink-0"
-                      >
-                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </button>
-                    </div>
 
-                    {/* Expandable Verbatim Clause Receipt */}
-                    {isExpanded && clause && (
-                      <div className="px-4 pb-4 pt-2 border-t border-white/5 bg-slate-950/60 space-y-1.5 animate-fadeIn">
-                        <div className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider flex items-center justify-between">
-                          <span>Verbatim Document Receipt</span>
-                          <span className="font-mono text-blue-400">p.{pageNum} Character-for-Character</span>
-                        </div>
-                        <blockquote className="font-serif italic text-xs leading-relaxed text-slate-300 pl-3 border-l-2 border-blue-500/50 bg-blue-500/[0.02] py-2 rounded-r">
-                          "{clause}"
-                        </blockquote>
+                      {ob.meaning && (
+                        <p className="text-sm text-forge-text leading-relaxed mb-1.5">
+                          <span className="text-2xs uppercase tracking-[0.14em] text-forge-accent block mb-1">
+                            What this means
+                          </span>
+                          {ob.meaning}
+                        </p>
+                      )}
+                      <p className="text-sm text-forge-muted leading-relaxed">{ob.change}</p>
+
+                      <div className="flex items-center justify-end gap-1 mt-2 text-3xs text-forge-dim">
+                        {expanded ? 'hide clause' : 'view clause'}
+                        {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      </div>
+                    </button>
+
+                    {expanded && (
+                      <div className="px-4 pb-4 animate-fade-in">
+                        {ob.verbatimClause ? (
+                          <blockquote className="p-3.5 rounded bg-forge-black border-l-2 border-mint/60">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-3xs uppercase tracking-[0.14em] text-forge-dim">
+                                Clause · page {ob.page}
+                              </span>
+                              <span className="text-3xs font-mono text-mint">
+                                matched in PDF
+                              </span>
+                            </div>
+                            <p className="font-serif italic text-sm text-forge-cream/90 leading-relaxed">
+                              “{ob.verbatimClause}”
+                            </p>
+                          </blockquote>
+                        ) : (
+                          <div className="p-3.5 rounded bg-amber/[0.06] border-l-2 border-amber/60">
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber" />
+                              <span className="text-3xs uppercase tracking-[0.14em] text-amber">
+                                Citation withheld
+                              </span>
+                            </div>
+                            <p className="text-xs text-forge-muted leading-relaxed">
+                              The quoted sentence was not found in this PDF, so it is not shown as
+                              evidence. Treat the obligation as unverified and re-read the source
+                              before relying on it.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -223,115 +294,201 @@ export default function ReviewDrawer({ insight, isOpen, onClose, onUpdated }) {
             </div>
           </div>
 
-          {/* UPGRADE 4: Hash-Chained Audit Ledger Receipt */}
+          {/* Ledger receipt */}
           {insight.approvalHash && (
-            <div className="p-4 rounded-xl bg-purple-950/20 border border-purple-500/30 space-y-2 text-xs">
-              <div className="flex items-center gap-2 font-semibold text-purple-300">
-                <Hash className="w-4 h-4" />
-                <span>Tamper-Evident SHA-256 Ledger Block</span>
+            <div className="p-4 rounded-lg bg-violet/[0.06] border border-violet/25">
+              <div className="flex items-center gap-2 text-xs font-medium text-violet mb-2">
+                <Hash className="w-4 h-4" /> Tamper-evident ledger block
               </div>
-              <div className="space-y-1 font-mono text-[11px] text-slate-400">
-                <div>
-                  <span className="text-slate-500">Block Hash:</span>{' '}
-                  <span className="text-purple-300">{insight.approvalHash}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500">Prev Hash:</span>{' '}
-                  <span className="text-slate-300">{insight.prevApprovalHash || 'GENESIS'}</span>
-                </div>
-                {insight.approvalReason && (
-                  <div>
-                    <span className="text-slate-500">Review Note:</span>{' '}
-                    <span className="text-slate-200 italic">"{insight.approvalReason}"</span>
-                  </div>
-                )}
-              </div>
+              <dl className="space-y-1 text-3xs font-mono">
+                <Row term="Block hash" value={insight.approvalHash} />
+                <Row term="Previous" value={insight.prevApprovalHash || 'GENESIS'} />
+                <Row term="Decided by" value={insight.approvedBy?.username || 'unknown'} />
+                <Row term="Decided at" value={insight.approvedAt ? new Date(insight.approvedAt).toLocaleString() : '—'} />
+              </dl>
             </div>
           )}
 
-          {/* Telemetry */}
-          <div className="p-4 rounded-xl bg-slate-900/60 border border-white/5 space-y-2 text-xs text-slate-400">
-            <div className="font-semibold text-slate-300 text-[11px] uppercase tracking-wider mb-2">Audit Telemetry</div>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Uploaded:</span>
-              <span className="text-slate-200">{insight.createdAt ? new Date(insight.createdAt).toLocaleString() : 'Recent'}</span>
+          {/* Existing note */}
+          {insight.reviewerNote && (
+            <div className="p-4 rounded-lg bg-forge-card border border-forge-border" style={{ borderColor: '#252a3a' }}>
+              <div className="text-2xs uppercase tracking-[0.16em] text-forge-dim mb-2">Reviewer note</div>
+              <p className="text-sm text-forge-text leading-relaxed">“{insight.reviewerNote}”</p>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Source Document:</span>
-              <span className="text-slate-200 truncate max-w-xs">{insight.documentId?.filename || 'regulation.pdf'}</span>
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Action Footer */}
-        <div className="p-6 border-t border-white/10 bg-[#070b14] space-y-3">
+        {/* Footer / actions */}
+        <div className="p-5 border-t border-forge-border bg-forge-black/50 space-y-3" style={{ borderColor: '#252a3a' }}>
           {isFinalized ? (
-            <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
-              <Lock className="w-4 h-4 text-slate-500" />
-              <span>
-                Finalized as <b className="text-slate-200">{insight.humanApprovalStatus}</b>. Ledger block locked.
-              </span>
-            </div>
-          ) : showReasonInput ? (
-            <div className="space-y-3 animate-fadeIn">
-              <div className="text-[11px] uppercase tracking-wider text-forge-muted font-sans flex items-center justify-between">
-                <span>Provide decision justification for {pendingAction}:</span>
-                <button
-                  type="button"
-                  onClick={() => setShowReasonInput(false)}
-                  className="text-forge-muted hover:text-white text-[10px] uppercase tracking-wider"
-                >
-                  Cancel
-                </button>
-              </div>
-              <textarea
-                rows={2}
-                value={decisionReason}
-                onChange={(e) => setDecisionReason(e.target.value)}
-                placeholder="Auditor notes & regulatory rationale..."
-                className="w-full p-3 bg-[#111114] border border-white/[0.08] rounded-sm text-xs text-white placeholder-forge-muted/40 focus:outline-none focus:border-forge-accent/50 font-sans"
-              />
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => handleDecision(pendingAction)}
-                className={`w-full py-3 rounded-sm text-[11px] uppercase tracking-[0.2em] font-sans font-semibold text-black bg-white hover:bg-forge-cream shadow-xl flex items-center justify-center gap-2 transition-all ${
-                  pendingAction === 'Approved' ? 'hover:shadow-emerald-950/30' : 'hover:shadow-rose-950/30'
-                }`}
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin text-black" /> : <span>Commit Decision To Ledger</span>}
-              </button>
-            </div>
+            <FinalizedBanner insight={insight} />
           ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => {
-                  setPendingAction('Rejected');
-                  setShowReasonInput(true);
-                }}
-                className="flex items-center justify-center gap-2 py-3 px-4 rounded-sm bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/25 text-[11px] uppercase tracking-[0.2em] font-sans font-medium transition-all disabled:opacity-40"
-              >
-                <XCircle className="w-4 h-4" />
-                <span>Reject Mandate</span>
-              </button>
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => {
-                  setPendingAction('Approved');
-                  setShowReasonInput(true);
-                }}
-                className="flex items-center justify-center gap-2 py-3 px-4 rounded-sm bg-white hover:bg-forge-cream text-black shadow-xl text-[11px] uppercase tracking-[0.2em] font-sans font-semibold transition-all disabled:opacity-40 hover:scale-[1.02]"
-              >
-                <CheckCircle className="w-4 h-4" />
-                <span>Approve Mandate</span>
-              </button>
-            </div>
+            <>
+              {/* Decision buttons */}
+              <div className="grid grid-cols-3 gap-2">
+                <DecisionButton
+                  active={decision === 'Approved'}
+                  disabled={!isAdmin}
+                  onClick={() => { setDecision('Approved'); setError(''); }}
+                  icon={CheckCircle}
+                  label="Approve"
+                  tone="mint"
+                  title={!isAdmin ? 'Requires administrator approval' : 'Approve this finding'}
+                />
+                <DecisionButton
+                  active={decision === 'Rejected'}
+                  disabled={!isAdmin}
+                  onClick={() => { setDecision('Rejected'); setError(''); }}
+                  icon={XCircle}
+                  label="Reject"
+                  tone="coral"
+                  title={!isAdmin ? 'Requires administrator approval' : 'Reject this finding'}
+                />
+                <DecisionButton
+                  active={decision === 'clarify'}
+                  onClick={() => { setDecision('clarify'); setError(''); }}
+                  icon={HelpCircle}
+                  label="Ask"
+                  tone="sky"
+                  title="Request clarification — the finding stays open"
+                />
+              </div>
+
+              {!isAdmin && (
+                <div className="flex items-center gap-2 text-2xs text-forge-dim">
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  Approve and reject require an administrator. You can still ask a question.
+                </div>
+              )}
+
+              {decision && (
+                <div className="space-y-2 animate-fade-in">
+                  <label className="block">
+                    <span className="block text-2xs uppercase tracking-[0.14em] text-forge-dim mb-1.5">
+                      {decision === 'clarify'
+                        ? 'Your question'
+                        : decision === 'Rejected'
+                          ? 'Rejection reason (required, 10+ characters)'
+                          : 'Approval note (optional)'}
+                    </span>
+                    <textarea
+                      rows={2}
+                      value={note}
+                      onChange={(e) => { setNote(e.target.value); setError(''); }}
+                      placeholder={
+                        decision === 'clarify'
+                          ? 'Does this apply to our offshore routing venue?'
+                          : decision === 'Rejected'
+                            ? 'Duplicate of an earlier notice; regulator withdrew this section.'
+                            : 'Reviewed against the Q3 control matrix.'
+                      }
+                      className="textarea-base"
+                      autoFocus
+                    />
+                  </label>
+
+                  {error && (
+                    <div role="alert" className="flex items-start gap-2 p-2.5 rounded border border-coral/40 bg-coral/10 text-coral text-xs">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <span>{error}</span>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button onClick={() => { setDecision(null); setNote(''); setError(''); }} className="btn-ghost flex-1 !py-2.5 !text-2xs">
+                      Cancel
+                    </button>
+                    <button onClick={submit} disabled={busy} className="btn-primary flex-1 !py-2.5 !text-2xs">
+                      {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                      {decision === 'clarify' ? 'Send question' : decision === 'Approved' ? 'Approve & seal' : 'Reject & seal'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {error && !decision && (
+                <div role="alert" className="flex items-start gap-2 p-2.5 rounded border border-coral/40 bg-coral/10 text-coral text-xs">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── Pieces ─────────────────────────────────────────────────── */
+
+function FinalizedBanner({ insight }) {
+  const approved = insight.humanApprovalStatus === 'Approved';
+  return (
+    <div
+      className={`p-3.5 rounded-lg border flex items-start gap-2.5 ${
+        approved ? 'border-mint/35 bg-mint/[0.07]' : 'border-coral/35 bg-coral/[0.07]'
+      }`}
+    >
+      <Lock className={`w-4 h-4 shrink-0 mt-0.5 ${approved ? 'text-mint' : 'text-coral'}`} />
+      <div className="text-xs leading-relaxed">
+        <div className={`font-medium ${approved ? 'text-mint' : 'text-coral'}`}>
+          {insight.humanApprovalStatus} by {insight.approvedBy?.username || 'unknown'}
+          {insight.approvedAt && ` · ${new Date(insight.approvedAt).toLocaleDateString()}`}
+        </div>
+        {insight.reviewerNote && (
+          <div className="text-forge-muted mt-1">“{insight.reviewerNote}”</div>
+        )}
+        <div className="text-forge-dim mt-1.5 flex items-center gap-1.5">
+          <UserCheck className="w-3 h-3" /> Decision is terminal and sealed in the ledger.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DecisionButton({ active, disabled, onClick, icon: Icon, label, tone, title }) {
+  const tones = {
+    mint: { on: 'border-mint/70 bg-mint/20 text-mint', off: 'text-forge-text hover:text-mint hover:border-mint/50' },
+    coral: { on: 'border-coral/70 bg-coral/20 text-coral', off: 'text-forge-text hover:text-coral hover:border-coral/50' },
+    sky: { on: 'border-sky/70 bg-sky/20 text-sky', off: 'text-forge-text hover:text-sky hover:border-sky/50' },
+  };
+  const t = tones[tone];
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`flex flex-col items-center justify-center gap-1.5 py-3 rounded border text-2xs uppercase tracking-[0.1em] transition-colors ${
+        disabled
+          ? 'border-forge-border text-forge-dim/50 cursor-not-allowed'
+          : active
+            ? t.on
+            : `border-forge-border ${t.off}`
+      }`}
+      style={!active ? { borderColor: '#252a3a' } : undefined}
+    >
+      <Icon className="w-4 h-4" />
+      {label}
+    </button>
+  );
+}
+
+function Meta({ label, value }) {
+  return (
+    <div className="p-3 rounded-lg bg-forge-card border border-forge-border" style={{ borderColor: '#252a3a' }}>
+      <div className="text-3xs uppercase tracking-[0.14em] text-forge-dim mb-1">{label}</div>
+      <div className="text-sm text-forge-text">{value}</div>
+    </div>
+  );
+}
+
+function Row({ term, value }) {
+  return (
+    <div className="flex gap-2">
+      <dt className="text-forge-dim w-24 shrink-0">{term}</dt>
+      <dd className="text-forge-text break-all">{value}</dd>
     </div>
   );
 }

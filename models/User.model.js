@@ -42,6 +42,14 @@ const userSchema = new mongoose.Schema(
       },
       default: 'researcher',
     },
+    // Declared regulatory scope. Used to triage every extracted obligation as
+    // APPLIES / OUT_OF_SCOPE / UNCLEAR. Saved once at onboarding.
+    applicability: {
+      jurisdiction: { type: String, default: '' },
+      entityTypes: { type: [String], default: [] },
+      businessLines: { type: [String], default: [] },
+      completedAt: { type: Date, default: null },
+    },
   },
   {
     timestamps: true,

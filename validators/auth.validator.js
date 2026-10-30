@@ -65,7 +65,28 @@ const approveInsightSchema = z.object({
   humanApprovalStatus: z.enum(['Approved', 'Rejected'], {
     error: "humanApprovalStatus must be 'Approved' or 'Rejected'.",
   }),
-  reason: z.string().optional(),
+  // `reason` is the field the existing UI sends; `note` is the newer name.
+  reason: z.string().max(1000).optional(),
+  note: z.string().max(1000).optional(),
+});
+
+/**
+ * Zod schema for PATCH /api/auth/users/:id/role
+ */
+const applicabilitySchema = z.object({
+  jurisdiction: z.string().max(80).optional().default(''),
+  entityTypes: z.array(z.string().max(60)).max(20).optional().default([]),
+  businessLines: z.array(z.string().max(60)).max(20).optional().default([]),
+});
+
+/**
+ * Zod schema for POST /api/research/insights/:id/clarify
+ */
+const clarifyInsightSchema = z.object({
+  question: z
+    .string({ error: 'A question is required.' })
+    .min(5, 'A clarification question must be at least 5 characters.')
+    .max(1000, 'A clarification question cannot exceed 1000 characters.'),
 });
 
 /**
@@ -102,5 +123,7 @@ module.exports = {
   loginSchema,
   approveInsightSchema,
   updateRoleSchema,
+  applicabilitySchema,
+  clarifyInsightSchema,
   validate,
 };

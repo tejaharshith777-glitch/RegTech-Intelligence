@@ -1,314 +1,525 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Search, CheckCircle2, XCircle, Clock, ShieldCheck, AlertOctagon,
-  RefreshCw, Plus, GitCompare, Hash, ChevronRight, ArrowRight,
+  RefreshCw, Plus, GitCompare, Hash, ChevronRight, Download, Table2,
+  ShieldAlert, Lock, Inbox, Fingerprint, Settings2, AlertTriangle,
 } from 'lucide-react';
-import { researchService } from '../services/api';
-import { useScrollReveal } from '../hooks/useScrollReveal';
+import { researchService, errorMessage } from '../services/api';
+import { useAuthStore } from '../store/authStore';
 import ReviewDrawer from '../components/ReviewDrawer';
-import UploadModal from '../components/UploadModal';
 import CompareModal from '../components/CompareModal';
+import ApplicabilityGate from '../components/ApplicabilityGate';
 import toast from 'react-hot-toast';
 
-function RevealSection({ children, className = '' }) {
-  const [ref, isVisible] = useScrollReveal({ threshold: 0.1 });
-  return (
-    <div ref={ref} className={`reveal ${isVisible ? 'visible' : ''} ${className}`}>
-      {children}
-    </div>
-  );
-}
+const APPLICABILITY_STYLES = {
+  APPLIES: { label: 'Applies', className: 'text-mint border-mint/40 bg-mint/10' },
+  OUT_OF_SCOPE: { label: 'Out of scope', className: 'text-forge-dim border-forge-border bg-forge-dark' },
+  UNCLEAR: { label: 'Unclear', className: 'text-amber border-amber/40 bg-amber/10' },
+};
 
-export default function Dashboard() {
+const currency = (n) => new Intl.NumberFormat('en-IN').format(n);
+
+export default function Dashboard({ onOpenUpload }) {
   const queryClient = useQueryClient();
-  const [selectedInsight, setSelectedInsight] = useState(null);
-  const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [isCompareOpen, setIsCompareOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
+
+  const [selected, setSelected] = useState(null);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const [riskFilter, setRiskFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [appliesFilter, setAppliesFilter] = useState(''); // '' | APPLIES | OUT_OF_SCOPE | UNCLEAR
+  const [scopeOpen, setScopeOpen] = useState(false);
+  const [exportingId, setExportingId] = useState(null);
 
-  const { data, isLoading, isError, refetch, isFetching } = useQuery({
+  const {
+    data, isLoading, isError, error, refetch, isFetching,
+  } = useQuery({
     queryKey: ['insights', riskFilter, statusFilter],
-    queryFn: () => researchService.getInsights({ riskLevel: riskFilter || undefined, status: statusFilter || undefined }),
-    refetchInterval: 15000,
+    queryFn: () => researchService.getInsights({
+      riskLevel: riskFilter || undefined,
+      status: statusFilter || undefined,
+    }),
   });
 
-  const { data: auditData } = useQuery({
+  const { data: auditData, isError: auditError } = useQuery({
     queryKey: ['auditChain'],
     queryFn: () => researchService.verifyAuditChain(),
-    refetchInterval: 10000,
   });
 
   const insights = data?.data?.insights || [];
-  const auditLedger = auditData?.data || { valid: true, entries: 0 };
+  const triage = data?.data?.triage || { obligations: 0, applies: 0, outOfScope: 0, unclear: 0, needsReview: 0 };
+  const ledger = auditData?.data;
 
-  const approvalMutation = useMutation({
-    mutationFn: ({ id, status }) => researchService.approveInsight(id, status, 'Dashboard review'),
-    onSuccess: (_, variables) => {
-      toast.success(`Marked as ${variables.status}`);
-      queryClient.invalidateQueries({ queryKey: ['insights'] });
-      queryClient.invalidateQueries({ queryKey: ['auditChain'] });
-    },
-    onError: (err) => toast.error(err.response?.data?.message || 'Action failed'),
-  });
-
-  const filteredInsights = insights.filter((item) => {
-    const filename = item.documentId?.filename || '';
-    const policies = (item.policyChangeSummary || []).map((p) => (typeof p === 'object' ? p.change : p)).join(' ');
-    return `${filename} ${policies}`.toLowerCase().includes(searchQuery.toLowerCase());
-  });
-
-  const totalDocs = insights.length;
-  const highRiskCount = insights.filter((i) => i.riskLevel === 'High').length;
   const pendingCount = insights.filter((i) => i.humanApprovalStatus === 'Pending').length;
-  const piiRedactedCount = insights.filter((i) => i.piiRedacted).length;
+  const highRisk = insights.filter((i) => i.riskLevel === 'High').length;
+  const piiCount = insights.reduce(
+    (sum, i) => sum + (i.piiAudit?.modelRedactions || 0) + (i.piiAudit?.serverRedactions || 0),
+    0
+  );
 
-  const getRiskBadge = (level) => {
-    const base = 'px-2.5 py-1 text-[10px] uppercase tracking-[0.15em] font-sans font-medium border';
-    switch (level?.toLowerCase()) {
-      case 'high': return <span className={`${base} bg-rose-500/10 text-rose-400 border-rose-500/20`}>High Risk</span>;
-      case 'medium': return <span className={`${base} bg-amber-500/10 text-amber-400 border-amber-500/20`}>Medium</span>;
-      default: return <span className={`${base} bg-emerald-500/10 text-emerald-400 border-emerald-500/20`}>Low Risk</span>;
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return insights.filter((insight) => {
+      const haystack = [
+        insight.documentId?.filename || '',
+        ...(insight.policyChangeSummary || []).map((p) => `${p.change} ${p.verbatimClause || ''}`),
+      ]
+        .join(' ')
+        .toLowerCase();
+      if (q && !haystack.includes(q)) return false;
+
+      if (appliesFilter) {
+        const has = (insight.policyChangeSummary || []).some((p) => p.applicability === appliesFilter);
+        if (!has) return false;
+      }
+      return true;
+    });
+  }, [insights, search, appliesFilter]);
+
+  const exportOne = async (insight, kind) => {
+    setExportingId(`${insight._id}-${kind}`);
+    try {
+      if (kind === 'pack') await researchService.downloadAuditPack(insight._id);
+      else await researchService.downloadObligationsCsv(insight._id);
+      toast.success(kind === 'pack' ? 'Audit pack downloaded' : 'CSV downloaded');
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setExportingId(null);
     }
   };
 
-  const getStatusBadge = (status) => {
-    const base = 'px-2.5 py-1 text-[10px] uppercase tracking-[0.15em] font-sans font-medium border flex items-center gap-1.5';
-    switch (status) {
-      case 'Approved': return <span className={`${base} bg-emerald-500/10 text-emerald-400 border-emerald-500/20`}>Approved</span>;
-      case 'Rejected': return <span className={`${base} bg-rose-500/10 text-rose-400 border-rose-500/20`}>Rejected</span>;
-      default: return <span className={`${base} bg-amber-500/10 text-amber-400 border-amber-500/20`}><Clock className="w-3 h-3" /> Pending</span>;
-    }
+  const refreshAll = () => {
+    refetch();
+    queryClient.invalidateQueries({ queryKey: ['auditChain'] });
   };
+
+  /* ── Loading ─────────────────────────────────────────────── */
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 gap-4">
+        <RefreshCw className="w-6 h-6 animate-spin text-forge-accent" />
+        <p className="text-sm text-forge-muted">Loading your obligations…</p>
+      </div>
+    );
+  }
+
+  /* ── Error ───────────────────────────────────────────────── */
+  if (isError) {
+    return (
+      <div className="max-w-lg mx-auto text-center py-24">
+        <div className="w-12 h-12 mx-auto rounded-lg bg-coral/10 border border-coral/30 flex items-center justify-center mb-5">
+          <AlertTriangle className="w-5 h-5 text-coral" />
+        </div>
+        <h2 className="font-serif text-2xl text-white mb-3">Could not load obligations</h2>
+        <p className="text-sm text-forge-muted mb-6 leading-relaxed">{errorMessage(error)}</p>
+        <button onClick={refreshAll} className="btn-primary">
+          <RefreshCw className="w-4 h-4" /> Try again
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 pb-6 border-b border-white/[0.04]">
+    <div className="space-y-6">
+      {/* ── Header ──────────────────────────────────────────── */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.3em] text-forge-accent font-sans mb-2">Regulatory Obligation Registry</p>
-          <h2 className="font-serif text-2xl md:text-3xl text-white">
-            Compliance <span className="italic">Intelligence</span>
-          </h2>
+          <p className="eyebrow mb-2">Obligation registry</p>
+          <h1 className="font-serif text-3xl md:text-4xl text-white leading-tight">
+            Compliance <span className="italic text-gradient-gold">intelligence</span>
+          </h1>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
-            onClick={() => setIsCompareOpen(true)}
+            onClick={() => setScopeOpen(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded border border-forge-border text-2xs uppercase tracking-[0.12em] text-forge-muted hover:text-forge-text hover:border-forge-accent/50 transition-colors"
+            style={{ borderColor: '#252a3a' }}
+            title="Change the entity types used to triage obligations"
+          >
+            <Settings2 className="w-3.5 h-3.5" />
+            My scope
+          </button>
+
+          <button
+            onClick={() => setCompareOpen(true)}
             disabled={insights.length < 2}
-            className="flex items-center gap-2 px-4 py-2.5 text-[10px] uppercase tracking-[0.15em] font-sans border border-white/[0.08] text-forge-muted hover:text-white hover:border-white/20 transition-all disabled:opacity-30"
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded border border-forge-border text-2xs uppercase tracking-[0.12em] text-forge-muted hover:text-forge-text hover:border-forge-accent/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ borderColor: '#252a3a' }}
+            title={insights.length < 2 ? 'Upload at least two circulars to compare versions' : 'Compare two circulars'}
           >
             <GitCompare className="w-3.5 h-3.5" />
-            <span>Compare Versions</span>
+            Compare
           </button>
-          <button
-            onClick={() => setIsUploadOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 text-[10px] uppercase tracking-[0.15em] font-sans border border-forge-accent/40 text-forge-accent hover:text-white hover:border-forge-accent transition-all hover:bg-forge-accent/5"
-          >
+
+          <button onClick={onOpenUpload} className="btn-primary !py-2.5 !px-5 !text-2xs">
             <Plus className="w-3.5 h-3.5" />
-            <span>Upload Document</span>
+            Upload circular
           </button>
         </div>
       </div>
 
-      {/* Trust Bar */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 py-4 px-5 bg-forge-card border border-white/[0.04]">
-        <div className="flex items-center gap-2.5 text-xs font-sans">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse-soft" />
-          <span className="text-white/70">Trust Architecture Active</span>
-          <span className="text-forge-muted/40">—</span>
-          <span className="text-forge-muted/60">Provenance receipts & verbatim clauses enabled</span>
-        </div>
-        <div className="flex items-center gap-4 text-[10px] font-mono">
-          <div className="flex items-center gap-1.5 text-forge-accent/70">
-            <Hash className="w-3 h-3" />
-            <span>Ledger: {auditLedger.valid ? 'VALID' : 'INVALID'} ({auditLedger.entries} Blocks)</span>
+      {/* ── Triage bar (every number is a filter) ───────────── */}
+      <div className="rounded-lg bg-forge-card border border-forge-border p-4" style={{ borderColor: '#252a3a' }}>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 text-sm">
+            <span className="text-forge-text font-medium">{currency(triage.obligations)} obligations</span>
+            <span className="text-forge-dim">·</span>
+            <button
+              onClick={() => setAppliesFilter(appliesFilter === 'APPLIES' ? '' : 'APPLIES')}
+              className={`px-2 py-0.5 rounded text-mint hover:bg-mint/10 transition-colors ${appliesFilter === 'APPLIES' ? 'bg-mint/10 underline' : ''}`}
+            >
+              {triage.applies + triage.unclear > 0 ? triage.applies : 0} apply to you
+            </button>
+            <span className="text-forge-dim">·</span>
+            <button
+              onClick={() => setAppliesFilter(appliesFilter === 'OUT_OF_SCOPE' ? '' : 'OUT_OF_SCOPE')}
+              className={`px-2 py-0.5 rounded text-forge-muted hover:bg-white/5 transition-colors ${appliesFilter === 'OUT_OF_SCOPE' ? 'bg-white/5 underline' : ''}`}
+            >
+              {triage.outOfScope} out of scope
+            </button>
+            <span className="text-forge-dim">·</span>
+            <button
+              onClick={() => setAppliesFilter(appliesFilter === 'UNCLEAR' ? '' : 'UNCLEAR')}
+              className={`px-2 py-0.5 rounded text-amber hover:bg-amber/10 transition-colors ${appliesFilter === 'UNCLEAR' ? 'bg-amber/10 underline' : ''}`}
+            >
+              {triage.unclear} need judgement
+            </button>
+            {appliesFilter && (
+              <button
+                onClick={() => setAppliesFilter('')}
+                className="ml-1 text-2xs uppercase tracking-[0.12em] text-forge-dim hover:text-forge-text underline"
+              >
+                clear
+              </button>
+            )}
           </div>
-          <div className="flex items-center gap-1.5 text-emerald-400/70">
-            <ShieldCheck className="w-3 h-3" />
-            <span>PII Residual: 0</span>
+
+          {/* Ledger state */}
+          <div className="flex items-center gap-3 text-2xs font-mono">
+            {auditError ? (
+              <span className="text-coral flex items-center gap-1.5">
+                <AlertTriangle className="w-3 h-3" /> ledger unreachable
+              </span>
+            ) : ledger ? (
+              <span className={`flex items-center gap-1.5 ${ledger.valid ? 'text-mint' : 'text-coral'}`}>
+                <Hash className="w-3 h-3" />
+                ledger {ledger.valid ? 'valid' : 'BROKEN'} · {ledger.entries} blocks
+              </span>
+            ) : (
+              <span className="text-forge-dim flex items-center gap-1.5">
+                <RefreshCw className="w-3 h-3 animate-spin" /> checking ledger
+              </span>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-white/[0.03]">
+      {/* ── Metrics ─────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'Total Analyzed', value: totalDocs, icon: FileText, color: 'text-white' },
-          { label: 'High Risk', value: highRiskCount, icon: AlertOctagon, color: 'text-rose-400' },
-          { label: 'PII Redacted', value: piiRedactedCount, icon: ShieldCheck, color: 'text-emerald-400' },
-          { label: 'Pending Review', value: pendingCount, icon: Clock, color: 'text-amber-400' },
+          { label: 'Circulars ingested', value: insights.length, icon: FileText, color: '#eef1f8' },
+          { label: 'High risk', value: highRisk, icon: AlertOctagon, color: '#ff7a90' },
+          { label: 'Awaiting decision', value: pendingCount, icon: Clock, color: '#fbbf24' },
+          { label: 'PII redactions', value: piiCount, icon: ShieldCheck, color: '#4ade9c' },
         ].map((m) => (
-          <div key={m.label} className="bg-forge-black p-6 group">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[10px] uppercase tracking-[0.2em] text-forge-muted/50 font-sans">{m.label}</span>
-              <m.icon className="w-4 h-4 text-forge-muted/20 group-hover:text-forge-muted/40 transition-colors" />
+          <div key={m.label} className="rounded-lg bg-forge-card border border-forge-border p-4" style={{ borderColor: '#252a3a' }}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-2xs uppercase tracking-[0.12em] text-forge-dim">{m.label}</span>
+              <m.icon className="w-4 h-4" style={{ color: m.color, opacity: 0.75 }} />
             </div>
-            <div className={`font-serif text-3xl ${m.color}`}>{m.value}</div>
+            <div className="font-serif text-3xl" style={{ color: m.color }}>{m.value}</div>
           </div>
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 py-4 px-5 bg-forge-card border border-white/[0.04]">
-        <div className="flex-1 relative">
-          <Search className="w-4 h-4 text-forge-muted/40 absolute left-4 top-1/2 -translate-y-1/2" />
+      {/* ── Filters ─────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-forge-dim absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
-            type="text"
-            placeholder="Search policies, regulations, or source files..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-11 pr-4 py-2.5 bg-forge-black border border-white/[0.06] text-sm text-white placeholder-forge-muted/30 font-sans focus:outline-none focus:border-forge-accent/30 transition-colors"
+            type="search"
+            placeholder="Search circulars, obligations or clause text…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="input-base pl-10"
+            aria-label="Search obligations"
           />
         </div>
-        <div className="flex items-center gap-2.5">
-          <select value={riskFilter} onChange={(e) => setRiskFilter(e.target.value)} className="bg-forge-black border border-white/[0.06] text-[11px] uppercase tracking-wider px-3 py-2.5 text-forge-muted font-sans focus:outline-none focus:border-forge-accent/30 cursor-pointer">
-            <option value="">All Risk</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-          </select>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-forge-black border border-white/[0.06] text-[11px] uppercase tracking-wider px-3 py-2.5 text-forge-muted font-sans focus:outline-none focus:border-forge-accent/30 cursor-pointer">
-            <option value="">All Status</option>
-            <option value="Pending">Pending</option>
-            <option value="Approved">Approved</option>
-            <option value="Rejected">Rejected</option>
-          </select>
-          <button
-            onClick={() => refetch()}
-            disabled={isFetching}
-            className="p-2.5 border border-white/[0.06] text-forge-muted hover:text-white transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-forge-accent' : ''}`} />
-          </button>
-        </div>
+
+        <select
+          value={riskFilter}
+          onChange={(e) => setRiskFilter(e.target.value)}
+          className="input-base sm:w-40 cursor-pointer"
+          aria-label="Filter by risk"
+        >
+          <option value="">All risk</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
+
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="input-base sm:w-44 cursor-pointer"
+          aria-label="Filter by decision status"
+        >
+          <option value="">All decisions</option>
+          <option value="Pending">Awaiting decision</option>
+          <option value="Approved">Approved</option>
+          <option value="Rejected">Rejected</option>
+        </select>
+
+        <button
+          onClick={refreshAll}
+          disabled={isFetching}
+          className="px-4 rounded border border-forge-border text-forge-muted hover:text-forge-text transition-colors disabled:opacity-50"
+          style={{ borderColor: '#252a3a' }}
+          title="Refresh"
+          aria-label="Refresh"
+        >
+          <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-forge-accent' : ''}`} />
+        </button>
       </div>
 
-      {/* Insights Registry */}
-      <div className="bg-forge-card border border-white/[0.04] overflow-hidden">
-        <div className="px-6 py-4 border-b border-white/[0.04] flex items-center justify-between">
-          <div>
-            <h3 className="font-serif text-lg text-white">Ingestion Registry</h3>
-            <p className="text-[10px] text-forge-muted/50 font-sans mt-0.5">Auditable findings with verbatim clauses & SHA-256 blocks</p>
-          </div>
-          <span className="text-[10px] font-mono text-forge-muted/40">
-            {filteredInsights.length} of {insights.length}
-          </span>
+      {/* ── Registry ────────────────────────────────────────── */}
+      {insights.length === 0 ? (
+        <EmptyState onOpenUpload={onOpenUpload} />
+      ) : filtered.length === 0 ? (
+        <div className="rounded-lg bg-forge-card border border-forge-border py-16 text-center" style={{ borderColor: '#252a3a' }}>
+          <Search className="w-6 h-6 text-forge-dim mx-auto mb-4" />
+          <p className="font-serif text-lg text-forge-text mb-1.5">No obligations match those filters</p>
+          <p className="text-sm text-forge-muted mb-5">Try clearing the search or the triage filter.</p>
+          <button
+            onClick={() => { setSearch(''); setAppliesFilter(''); setRiskFilter(''); setStatusFilter(''); }}
+            className="btn-ghost !py-2.5 !px-5 !text-2xs"
+          >
+            Clear filters
+          </button>
         </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((insight) => {
+            const obligations = insight.policyChangeSummary || [];
+            const applies = obligations.filter((o) => o.applicability === 'APPLIES').length;
+            const decided = insight.humanApprovalStatus !== 'Pending';
 
-        {isLoading ? (
-          <div className="p-20 text-center">
-            <RefreshCw className="w-5 h-5 animate-spin mx-auto text-forge-accent/60 mb-3" />
-            <p className="text-xs text-forge-muted/50 font-sans">Loading compliance insights...</p>
-          </div>
-        ) : isError ? (
-          <div className="p-20 text-center text-rose-400/60 text-xs font-sans">
-            Failed to connect to backend. Ensure server is running.
-          </div>
-        ) : filteredInsights.length === 0 ? (
-          <div className="p-20 text-center">
-            <div className="w-12 h-12 mx-auto border border-white/[0.06] flex items-center justify-center mb-4">
-              <FileText className="w-5 h-5 text-forge-muted/30" />
-            </div>
-            <p className="font-serif text-lg text-white/60 mb-2">No insights found</p>
-            <p className="text-xs text-forge-muted/40 font-sans mb-6">Upload a regulatory PDF to begin analysis</p>
-            <button
-              onClick={() => setIsUploadOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 text-[10px] uppercase tracking-[0.15em] font-sans border border-forge-accent/40 text-forge-accent hover:text-white transition-all hover:bg-forge-accent/5"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Upload Document</span>
-            </button>
-          </div>
-        ) : (
-          <div className="divide-y divide-white/[0.03]">
-            {filteredInsights.map((insight) => {
-              const pii = insight.piiAudit || { modelRedactions: 3, serverRedactions: 0, residualAfterScan: 0 };
-              return (
-                <div
-                  key={insight._id}
-                  onClick={() => setSelectedInsight(insight)}
-                  className="p-5 md:p-6 hover:bg-white/[0.015] transition-all duration-300 cursor-pointer group flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-                >
-                  {/* Left */}
-                  <div className="space-y-3 flex-1">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="font-serif text-base text-white/90 group-hover:text-forge-cream transition-colors flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-forge-accent/50 shrink-0" />
-                        {insight.documentId?.filename || 'Regulatory Directive.pdf'}
+            return (
+              <article
+                key={insight._id}
+                className="rounded-lg bg-forge-card border border-forge-border hover:border-forge-accent/30 transition-colors overflow-hidden"
+                style={{ borderColor: '#252a3a' }}
+              >
+                <div className="p-5">
+                  {/* Title row */}
+                  <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                    <button onClick={() => setSelected(insight)} className="flex items-start gap-2.5 text-left group flex-1 min-w-0">
+                      <FileText className="w-4 h-4 text-forge-accent shrink-0 mt-1" />
+                      <span className="min-w-0">
+                        <span className="block font-serif text-lg text-forge-cream group-hover:text-forge-gold transition-colors truncate">
+                          {insight.documentId?.filename || 'Regulatory circular'}
+                        </span>
+                        <span className="block text-2xs text-forge-dim mt-0.5">
+                          {obligations.length} obligation{obligations.length === 1 ? '' : 's'}
+                          {applies > 0 && ` · ${applies} apply to you`}
+                          {insight.createdAt && ` · ingested ${new Date(insight.createdAt).toLocaleDateString()}`}
+                        </span>
                       </span>
-                      {getRiskBadge(insight.riskLevel)}
-                      {getStatusBadge(insight.humanApprovalStatus)}
+                    </button>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <RiskBadge level={insight.riskLevel} />
+                      <StatusBadge status={insight.humanApprovalStatus} />
                     </div>
+                  </div>
 
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="text-[9px] font-mono text-emerald-400/60 flex items-center gap-1 border border-emerald-500/10 px-2 py-0.5">
-                        <ShieldCheck className="w-3 h-3" /> PII {pii.modelRedactions}+{pii.serverRedactions} · Res: {pii.residualAfterScan}
-                      </span>
-                      {insight.approvalHash && (
-                        <span className="text-[9px] font-mono text-forge-accent/50 flex items-center gap-1 border border-forge-accent/10 px-2 py-0.5">
-                          <Hash className="w-3 h-3" /> {insight.approvalHash.slice(0, 12)}
+                  {/* Obligation previews (two layers) */}
+                  <div className="space-y-2 mb-4">
+                    {obligations.slice(0, 2).map((ob, idx) => (
+                      <div key={idx} className="p-3 rounded bg-forge-black/60 border border-forge-border" style={{ borderColor: '#252a3a' }}>
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          <TierChip tier={ob.obligation} />
+                          <ApplicabilityChip value={ob.applicability} />
+                          {ob.verbatimClause ? (
+                            <span className="flex items-center gap-1 text-3xs font-mono text-mint">
+                              <Fingerprint className="w-3 h-3" /> p.{ob.page}
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-3xs font-mono text-amber">
+                              <AlertTriangle className="w-3 h-3" /> no verifiable clause
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-forge-text leading-relaxed">{ob.change}</p>
+                        {ob.verbatimClause && (
+                          <p className="mt-1.5 text-xs text-forge-dim italic line-clamp-1">
+                            “{ob.verbatimClause}”
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                    {obligations.length > 2 && (
+                      <button
+                        onClick={() => setSelected(insight)}
+                        className="text-2xs text-forge-gold hover:underline pl-1"
+                      >
+                        + {obligations.length - 2} more →
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Footer actions */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-forge-border" style={{ borderColor: '#252a3a' }}>
+                    <div className="flex items-center gap-2">
+                      {decided ? (
+                        <span className="text-2xs text-forge-dim flex items-center gap-1.5">
+                          <Lock className="w-3 h-3" />
+                          {insight.humanApprovalStatus} by {insight.approvedBy?.username || 'unknown'}
+                          {insight.approvedAt && ` · ${new Date(insight.approvedAt).toLocaleDateString()}`}
+                        </span>
+                      ) : (
+                        <span className="text-2xs text-amber flex items-center gap-1.5">
+                          <Clock className="w-3 h-3" /> Awaiting administrator decision
                         </span>
                       )}
                     </div>
 
-                    <ul className="text-xs text-forge-muted/70 font-sans space-y-1 pl-6 list-disc marker:text-forge-accent/30">
-                      {insight.policyChangeSummary?.slice(0, 2).map((policy, pIdx) => {
-                        const changeText = typeof policy === 'object' ? policy.change : policy;
-                        const pageNum = typeof policy === 'object' ? policy.page || 1 : 1;
-                        return (
-                          <li key={pIdx} className="leading-relaxed">
-                            <span>{changeText}</span>{' '}
-                            <span className="text-[10px] font-mono text-forge-muted/40">(p. {pageNum})</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    {insight.policyChangeSummary?.length > 2 && (
-                      <p className="text-[10px] text-forge-accent/60 pl-6 font-sans">
-                        +{insight.policyChangeSummary.length - 2} more mandates →
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Right: Actions */}
-                  <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                    {insight.humanApprovalStatus === 'Pending' ? (
-                      <>
-                        <button
-                          onClick={() => approvalMutation.mutate({ id: insight._id, status: 'Approved' })}
-                          disabled={approvalMutation.isPending}
-                          className="flex items-center gap-1.5 px-3 py-2 text-[10px] uppercase tracking-wider font-sans border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10 transition-all"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Approve
-                        </button>
-                        <button
-                          onClick={() => approvalMutation.mutate({ id: insight._id, status: 'Rejected' })}
-                          disabled={approvalMutation.isPending}
-                          className="flex items-center gap-1.5 px-3 py-2 text-[10px] uppercase tracking-wider font-sans border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 transition-all"
-                        >
-                          <XCircle className="w-3.5 h-3.5" /> Reject
-                        </button>
-                      </>
-                    ) : (
-                      <span className="text-[10px] text-forge-muted/40 font-mono italic">
-                        {insight.humanApprovalStatus}
-                      </span>
-                    )}
-                    <ChevronRight className="w-4 h-4 text-forge-muted/20 group-hover:text-forge-muted/60 group-hover:translate-x-0.5 transition-all" />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => exportOne(insight, 'csv')}
+                        disabled={exportingId === `${insight._id}-csv`}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-forge-border text-3xs uppercase tracking-[0.1em] text-forge-muted hover:text-forge-text hover:border-forge-accent/40 transition-colors disabled:opacity-50"
+                        style={{ borderColor: '#252a3a' }}
+                        title="Download obligations as CSV"
+                      >
+                        <Table2 className="w-3 h-3" /> CSV
+                      </button>
+                      <button
+                        onClick={() => exportOne(insight, 'pack')}
+                        disabled={exportingId === `${insight._id}-pack`}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-forge-border text-3xs uppercase tracking-[0.1em] text-forge-muted hover:text-forge-text hover:border-forge-accent/40 transition-colors disabled:opacity-50"
+                        style={{ borderColor: '#252a3a' }}
+                        title="Download the audit pack"
+                      >
+                        <Download className="w-3 h-3" /> Audit pack
+                      </button>
+                      <button
+                        onClick={() => setSelected(insight)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded bg-forge-raised text-3xs uppercase tracking-[0.1em] text-forge-text hover:bg-forge-accent/15 hover:text-forge-gold transition-colors"
+                      >
+                        Review <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
-      <ReviewDrawer insight={selectedInsight} isOpen={!!selectedInsight} onClose={() => setSelectedInsight(null)} onUpdated={() => { queryClient.invalidateQueries({ queryKey: ['insights'] }); queryClient.invalidateQueries({ queryKey: ['auditChain'] }); }} />
-      <UploadModal isOpen={isUploadOpen} onClose={() => setIsUploadOpen(false)} onSuccess={() => { queryClient.invalidateQueries({ queryKey: ['insights'] }); queryClient.invalidateQueries({ queryKey: ['auditChain'] }); }} />
-      <CompareModal isOpen={isCompareOpen} onClose={() => setIsCompareOpen(false)} documents={insights} />
+                {/* Non-admin notice, visible without opening the drawer */}
+                {!decided && !isAdmin && (
+                  <div className="px-5 py-2.5 bg-forge-dark/60 border-t border-forge-border flex items-center gap-2 text-2xs text-forge-dim" style={{ borderColor: '#252a3a' }}>
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    You can read and request clarification. Approval requires an administrator.
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      <ReviewDrawer
+        insight={selected}
+        isOpen={!!selected}
+        onClose={() => setSelected(null)}
+        onUpdated={refreshAll}
+      />
+
+      <CompareModal isOpen={compareOpen} onClose={() => setCompareOpen(false)} documents={insights} />
+
+      {scopeOpen && (
+        <ApplicabilityGate
+          onDone={() => setScopeOpen(false)}
+          onSkip={() => setScopeOpen(false)}
+        />
+      )}
     </div>
+  );
+}
+
+/* ── Small pieces ───────────────────────────────────────────── */
+
+function EmptyState({ onOpenUpload }) {
+  return (
+    <div className="rounded-lg bg-forge-card border border-dashed border-forge-border py-20 px-6 text-center" style={{ borderColor: '#2f3548' }}>
+      <div className="w-14 h-14 mx-auto rounded-lg bg-forge-accent/10 border border-forge-accent/30 flex items-center justify-center mb-5">
+        <Inbox className="w-6 h-6 text-forge-accent" />
+      </div>
+      <h2 className="font-serif text-2xl text-white mb-2">No circulars yet</h2>
+      <p className="text-sm text-forge-muted max-w-sm mx-auto mb-7 leading-relaxed">
+        Drop your first regulatory PDF here. You will get obligations with verified clauses,
+        PII redaction proof, and a triage against your declared scope.
+      </p>
+      <button onClick={onOpenUpload} className="btn-primary">
+        <Plus className="w-4 h-4" /> Upload your first circular
+      </button>
+      <p className="text-3xs text-forge-dim mt-5">
+        Sample circulars are built in if you do not have a PDF handy.
+      </p>
+    </div>
+  );
+}
+
+function RiskBadge({ level }) {
+  const styles =
+    level === 'High'
+      ? 'text-coral border-coral/40 bg-coral/10'
+      : level === 'Medium'
+        ? 'text-amber border-amber/40 bg-amber/10'
+        : 'text-mint border-mint/40 bg-mint/10';
+  return (
+    <span className={`px-2 py-1 rounded border text-3xs uppercase tracking-[0.12em] ${styles}`}>
+      {level || 'Low'}
+    </span>
+  );
+}
+
+function StatusBadge({ status }) {
+  const map = {
+    Approved: { cls: 'text-mint border-mint/40 bg-mint/10', Icon: CheckCircle2 },
+    Rejected: { cls: 'text-coral border-coral/40 bg-coral/10', Icon: XCircle },
+    Pending: { cls: 'text-amber border-amber/40 bg-amber/10', Icon: Clock },
+  };
+  const { cls, Icon } = map[status] || map.Pending;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-3xs uppercase tracking-[0.12em] ${cls}`}>
+      <Icon className="w-3 h-3" />
+      {status === 'Pending' ? 'Awaiting' : status}
+    </span>
+  );
+}
+
+function TierChip({ tier }) {
+  const map = {
+    MANDATORY: 'text-coral border-coral/40 bg-coral/10',
+    RECOMMENDED: 'text-amber border-amber/40 bg-amber/10',
+    ADVISORY: 'text-sky border-sky/40 bg-sky/10',
+  };
+  return (
+    <span className={`px-1.5 py-0.5 rounded border text-3xs font-mono uppercase ${map[tier] || map.MANDATORY}`}>
+      {tier || 'MANDATORY'}
+    </span>
+  );
+}
+
+function ApplicabilityChip({ value }) {
+  const style = APPLICABILITY_STYLES[value] || APPLICABILITY_STYLES.UNCLEAR;
+  return (
+    <span className={`px-1.5 py-0.5 rounded border text-3xs uppercase tracking-[0.1em] ${style.className}`}>
+      {style.label}
+    </span>
   );
 }

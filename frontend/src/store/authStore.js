@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 
-export const useAuthStore = create((set, get) => ({
+/**
+ * Authentication state.
+ *
+ * Deliberately has NO "switch role" helper. In an earlier version a dropdown
+ * let anyone log themselves in as an administrator from the UI, which made the
+ * whole maker-checker story theatre. Roles now come from the server only.
+ */
+export const useAuthStore = create((set) => ({
   user: JSON.parse(localStorage.getItem('regtech_user') || 'null'),
   token: localStorage.getItem('regtech_jwt') || null,
   isAuthenticated: !!localStorage.getItem('regtech_jwt'),
@@ -11,30 +18,17 @@ export const useAuthStore = create((set, get) => ({
     set({ user, token, isAuthenticated: true });
   },
 
+  /** Refresh the cached profile after /auth/me or an applicability save. */
+  setUser: (user) => {
+    localStorage.setItem('regtech_user', JSON.stringify(user));
+    set({ user });
+  },
+
   logout: () => {
     localStorage.removeItem('regtech_jwt');
     localStorage.removeItem('regtech_user');
     set({ user: null, token: null, isAuthenticated: false });
   },
 
-  // Helper for fast developer switching between Admin and Researcher demo roles
-  quickSwitchRole: async (role) => {
-    try {
-      const email = role === 'admin' ? 'admin@compliance.org' : 'researcher@compliance.org';
-      const password = role === 'admin' ? 'AdminPass123!' : 'ResearcherPass123!';
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      if (data.success && data.data?.token) {
-        get().setAuth(data.data.user, data.data.token);
-        return true;
-      }
-    } catch (e) {
-      console.error('Role switch failed:', e);
-    }
-    return false;
-  },
+  isAdmin: () => useAuthStore.getState().user?.role === 'admin',
 }));

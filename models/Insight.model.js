@@ -11,13 +11,26 @@ const policyObligationSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Policy change summary is required.'],
     },
+    // Plain-language "what this means for you", safe to forward internally.
+    meaning: {
+      type: String,
+      default: null,
+    },
     page: {
       type: Number,
-      default: 1,
+      default: null,
     },
     verbatimClause: {
       type: String,
-      required: [true, 'Verbatim source clause is required for audit provenance.'],
+      default: null,
+      // A clause is only mandatory when the server could not disprove it.
+      validate: {
+        validator: function (v) {
+          if (this.clauseVerification === 'mismatch') return true;
+          return typeof v === 'string' && v.trim().length > 0;
+        },
+        message: 'Verbatim source clause is required for audit provenance.',
+      },
     },
     obligation: {
       type: String,
@@ -27,6 +40,20 @@ const policyObligationSchema = new mongoose.Schema(
     deadline: {
       type: String,
       default: null,
+    },
+    // Entity types the obligation targets, derived only from the document's
+    // stated scope. Empty array means the document did not say.
+    appliesTo: {
+      type: [String],
+      default: [],
+    },
+    // 'verified'   - clause was found character-for-character in the PDF text
+    // 'unverified' - PDF text could not be extracted (e.g. a scanned image)
+    // 'mismatch'   - clause was NOT found in the document, so it was nulled out
+    clauseVerification: {
+      type: String,
+      enum: ['verified', 'unverified', 'mismatch'],
+      default: 'unverified',
     },
   },
   { _id: false }
@@ -103,6 +130,21 @@ const insightSchema = new mongoose.Schema(
       default: null,
     },
     approvedAt: {
+      type: Date,
+      default: null,
+    },
+    reviewerNote: {
+      type: String,
+      default: null,
+      maxlength: [1000, 'A reviewer note cannot exceed 1000 characters.'],
+    },
+    // A researcher may ask a question without deciding. Status stays Pending.
+    clarificationRequestedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    clarificationRequestedAt: {
       type: Date,
       default: null,
     },

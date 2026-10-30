@@ -4,15 +4,27 @@ const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
 
-const { register, login, getMe } = require('../controllers/auth.controller');
+const {
+  register,
+  login,
+  getMe,
+  updateUserRole,
+  updateApplicability,
+} = require('../controllers/auth.controller');
 const { protect } = require('../middleware/auth.middleware');
 const { requireAdmin } = require('../middleware/role.middleware');
-const { registerSchema, loginSchema, updateRoleSchema, validate } = require('../validators/auth.validator');
+const {
+  registerSchema,
+  loginSchema,
+  updateRoleSchema,
+  applicabilitySchema,
+  validate,
+} = require('../validators/auth.validator');
 
 // ─── Auth-specific Rate Limiter ─────────────────────────────────────────────
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200,                  // Relaxed for local development and testing
+  max: 30,                   // Brute-force guard: 30 attempts / 15 min / IP
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -52,18 +64,11 @@ router.post('/login', authLimiter, validate(loginSchema), login);
  */
 router.get('/me', protect, getMe);
 
-// Update a user's role — admin only
-const User = require('../models/User.model');
-router.patch('/users/:id/role', protect, requireAdmin, validate(updateRoleSchema), async (req, res, next) => {
-  try {
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { role: req.body.role },
-      { new: true, runValidators: true }
-    ).select('-password');
-    if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
-    return res.status(200).json({ success: true, data: { user } });
-  } catch (err) { return next(err); }
-});
+// Save the signed-in user's declared regulatory scope (triage inputs)
+router.patch('/me/applicability', protect, validate(applicabilitySchema), updateApplicability);
+
+// Promote or demote a user — administrators only. Self-demotion and
+// removal of the last administrator are refused in the controller.
+router.patch('/users/:id/role', protect, requireAdmin, validate(updateRoleSchema), updateUserRole);
 
 module.exports = router;

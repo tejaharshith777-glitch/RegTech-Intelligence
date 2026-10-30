@@ -1,6 +1,7 @@
 'use strict';
 
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const User = require('../models/User.model');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -41,12 +42,24 @@ const register = async (req, res, next) => {
       });
     }
 
+    // The role is NEVER taken from the request body. The only way to become an
+    // administrator is to be listed in the server-side ADMIN_EMAILS env var
+    // (a deployment bootstrap), or to be promoted later by an existing admin.
+    const adminEmails = (process.env.ADMIN_EMAILS || '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+
+    const assignedRole = adminEmails.includes(String(email).toLowerCase())
+      ? 'admin'
+      : 'researcher';
+
     // Create user — password hashed by the pre-save hook in User.model.js
     const user = await User.create({
       username,
       email,
       password,
-      role: 'researcher', // hardcoded — the only safe default
+      role: assignedRole,
     });
 
     const token = generateToken(user._id.toString());
@@ -134,4 +147,108 @@ const getMe = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, getMe };
+
+/**
+ * @desc    Promote or demote a user. Administrator only.
+ * @route   PATCH /api/auth/users/:id/role
+ * @access  Private (admin)
+ */
+const updateUserRole = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: `"${id}" is not a valid user ID.` });
+    }
+
+    if (String(req.user._id) === String(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot change your own role. Ask another administrator.',
+      });
+    }
+
+    const target = await User.findById(id);
+    if (!target) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    // Never allow the last administrator to be demoted out of existence.
+    if (target.role === 'admin' && role !== 'admin') {
+      const adminCount = await User.countDocuments({ role: 'admin' });
+      if (adminCount <= 1) {
+        return res.status(409).json({
+          success: false,
+          message: 'At least one administrator must remain.',
+        });
+      }
+    }
+
+    target.role = role;
+    await target.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Role updated.',
+      data: {
+        user: {
+          id: target._id,
+          username: target.username,
+          email: target.email,
+          role: target.role,
+        },
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
+ * @desc    Save the current user's declared regulatory scope (triage inputs)
+ * @route   PATCH /api/auth/me/applicability
+ * @access  Private
+ */
+const updateApplicability = async (req, res, next) => {
+  try {
+    const { jurisdiction, entityTypes, businessLines } = req.body;
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    user.applicability = {
+      jurisdiction: jurisdiction || '',
+      entityTypes: Array.isArray(entityTypes) ? entityTypes : [],
+      businessLines: Array.isArray(businessLines) ? businessLines : [],
+      completedAt: new Date(),
+    };
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Applicability profile saved.',
+      data: {
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          applicability: user.applicability,
+        },
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
+ * @desc    Lightweight authenticated liveness check used by the UI on boot
+ * @route   GET /api/auth/me
+ * @access  Private
+ */
+module.exports = { register, login, getMe, updateUserRole, updateApplicability };
+

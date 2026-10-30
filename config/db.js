@@ -246,6 +246,10 @@ const connectDB = async () => {
   const uri = process.env.MONGODB_URI;
 
   if (!uri) {
+    if (process.env.NODE_ENV === 'production' || process.env.DISABLE_MEMORY_FALLBACK === 'true') {
+      console.error('[db] FATAL: MONGODB_URI is not set. Refusing to start without a database.');
+      process.exit(1);
+    }
     setupInMemoryFallback();
     return;
   }
@@ -257,8 +261,8 @@ const connectDB = async () => {
     });
     console.log(`[db] ✅ MongoDB connected: ${conn.connection.host}`);
   } catch (error) {
-    if (process.env.NODE_ENV === 'production') {
-      console.error(`[db] ❌ MongoDB connection failed in production: ${error.message}`);
+    if (process.env.NODE_ENV === 'production' || process.env.DISABLE_MEMORY_FALLBACK === 'true') {
+      console.error(`[db] FATAL: cannot reach MongoDB (${error.message}). Refusing to start.`);
       process.exit(1);
     }
     console.warn(`[db] ⚠️  MongoDB connection warning: ${error.message}`);

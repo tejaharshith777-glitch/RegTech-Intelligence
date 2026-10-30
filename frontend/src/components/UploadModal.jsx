@@ -1,484 +1,431 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
-  UploadCloud,
-  FileCheck,
-  AlertTriangle,
-  X,
-  Sparkles,
-  ShieldCheck,
-  Loader2,
-  FileText,
-  CheckCircle2,
+  UploadCloud, X, FileText, Loader2, CheckCircle2, AlertTriangle,
+  RefreshCw, ShieldCheck, Sparkles, Trash2,
 } from 'lucide-react';
-import { researchService } from '../services/api';
+import { researchService, errorMessage } from '../services/api';
 import toast from 'react-hot-toast';
 
-const PRELOADED_SAMPLES = [
+/**
+ * Queue-based upload.
+ *
+ * Each file gets its own lifecycle line, so a failure on file 3 does not
+ * silently swallow files 1 and 2. The drop zone stays visible and accepts
+ * several PDFs at once.
+ */
+
+const MAX_MB = 15;
+const MAX_FILES = 8;
+
+/** Minimal valid one-page PDFs with a real (uncompressed) text layer. */
+const SAMPLE_PDFS = [
   {
     name: 'FINRA_Regulatory_Notice_2026.pdf',
-    title: 'FINRA 26-08 (Algorithmic Trading & Order Routing)',
-    type: 'Broker-Dealer Notice',
-    content: `%PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> endobj
-4 0 obj << /Length 380 >> stream
-BT
-/F1 12 Tf
-50 720 Td
-(FINRA REGULATORY NOTICE 26-08: ALGORITHMIC TRADING) Tj
-0 -24 Td
-(Chief Compliance Officer: Michael Vance, SSN: 111-22-3333, Email: mvance@finra-bd.org) Tj
-0 -24 Td
-(Mandate 1: Customer order routing disclosures must be published on public web portal monthly.) Tj
-0 -18 Td
-(Mandate 2: Algorithmic execution systems must complete semi-annual stress testing.) Tj
-ET
-endstream endobj
-xref
-0 5
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000214 00000 n 
-trailer << /Root 1 0 R /Size 5 >>
-startxref
-640
-%%EOF`
+    label: 'FINRA 26-08 · algorithmic trading',
+    lines: [
+      'FINRA REGULATORY NOTICE 26-08: ALGORITHMIC TRADING GOVERNANCE',
+      'Prepared by: Michael Vance (SSN: 111-22-3333, Email: mvance@broker-dealer.finra.org)',
+      'Scope: This notice applies to member firms that operate algorithmic execution venues.',
+      '[1] Member firms must update customer order routing disclosures on the public investor portal within 30 calendar days of each quarter.',
+      '[2] Algorithmic execution systems must complete semi-annual stress testing under stressed liquidity conditions.',
+    ],
   },
   {
     name: 'SEC_Digital_Assets_Directive_2026.pdf',
-    title: 'SEC 2026-D (Qualified Custody & Segregated Reserves)',
-    type: 'SEC Rulemaking',
-    content: `%PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> endobj
-4 0 obj << /Length 380 >> stream
-BT
-/F1 12 Tf
-50 720 Td
-(SEC SPECIAL DIRECTIVE 2026-D: QUALIFIED CUSTODY) Tj
-0 -24 Td
-(Auditor: Sarah Jenkins, Email: sjenkins@sec-review.gov, Phone: 202-551-8900) Tj
-0 -24 Td
-(Policy 1: All registered crypto custodians must maintain 100% segregated cold wallet balances.) Tj
-0 -18 Td
-(Policy 2: Proof of reserves cryptographic attestation must be filed every 24 hours.) Tj
-ET
-endstream endobj
-xref
-0 5
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000214 00000 n 
-trailer << /Root 1 0 R /Size 5 >>
-startxref
-640
-%%EOF`
+    label: 'SEC 2026-D · qualified custody',
+    lines: [
+      'SEC SPECIAL DIRECTIVE 2026-D: QUALIFIED CUSTODY STANDARDS',
+      'Audited by: Sarah Jenkins (Email: sjenkins@sec-review.gov, Direct Line: 202-551-8900)',
+      'Scope: Registered digital asset custodians and broker-dealers holding client crypto assets.',
+      '[1] Digital asset custodians must maintain 100% segregated cold wallet balances at all times.',
+      '[2] A cryptographic proof-of-reserves attestation must be filed every 24 hours.',
+    ],
   },
   {
     name: 'GDPR_Cross_Border_Transfer_Audit.pdf',
-    title: 'EU GDPR Article 46 (International Data Transfers)',
-    type: 'Privacy Compliance',
-    content: `%PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> endobj
-4 0 obj << /Length 380 >> stream
-BT
-/F1 12 Tf
-50 720 Td
-(EU GDPR ENFORCEMENT MEMORANDUM: ARTICLE 46) Tj
-0 -24 Td
-(Data Protection Officer: Elena Rostova, Phone: +44 20 7946 0912, Passport: GBR-90823412) Tj
-0 -24 Td
-(Policy 1: Standard Contractual Clauses (SCCs) require zero-knowledge encryption key residency.) Tj
-0 -18 Td
-(Policy 2: Documented Transfer Impact Assessments must be re-certified annually.) Tj
-ET
-endstream endobj
-xref
-0 5
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000214 00000 n 
-trailer << /Root 1 0 R /Size 5 >>
-startxref
-640
-%%EOF`
+    label: 'GDPR Art. 46 · data transfers',
+    lines: [
+      'EU GDPR ENFORCEMENT MEMORANDUM: ARTICLE 46 AUDIT GUIDANCE',
+      'Lead Examiner: Elena Rostova (Phone: +44 20 7946 0912, Passport: GBR-90823412)',
+      'Scope: Controllers and processors transferring personal data outside the EEA.',
+      '[1] Standard Contractual Clauses must be supplemented by a documented transfer impact assessment.',
+      '[2] Transfer impact assessments must be re-certified annually and retained for five years.',
+    ],
   },
   {
     name: 'HIPAA_Security_Rule_Cybersecurity_Update.pdf',
-    title: 'HHS HIPAA Security Rule (ePHI Encryption & Breach Notice)',
-    type: 'Healthcare Audit',
-    content: `%PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> endobj
-4 0 obj << /Length 380 >> stream
-BT
-/F1 12 Tf
-50 720 Td
-(HHS HIPAA SECURITY AMENDMENT: MANDATORY ePHI ENCRYPTION) Tj
-0 -24 Td
-(Privacy Liaison: David K. Miller, DOB: 1982-04-15, Address: 742 Evergreen Terr, Seattle) Tj
-0 -24 Td
-(Policy 1: Covered entities must mandate hardware-backed FIDO2 MFA for electronic PHI access.) Tj
-0 -18 Td
-(Policy 2: Ransomware incidents must be reported to HHS OCR within 72 hours.) Tj
-ET
-endstream endobj
-xref
-0 5
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000214 00000 n 
-trailer << /Root 1 0 R /Size 5 >>
-startxref
-640
-%%EOF`
+    label: 'HIPAA · ePHI security update',
+    lines: [
+      'HHS HIPAA SECURITY AMENDMENT: MANDATORY ePHI ENCRYPTION STANDARDS',
+      'Privacy Liaison: David K. Miller (DOB: 1982-04-15, Address: 742 Evergreen Terrace, Seattle, WA)',
+      'Scope: Covered entities and business associates handling electronic protected health information.',
+      '[1] Covered entities must implement phishing-resistant multi-factor authentication for all ePHI access.',
+      '[2] Ransomware incidents affecting ePHI must be reported to HHS OCR within 72 hours of discovery.',
+    ],
   },
   {
     name: 'Basel_III_Capital_Adequacy_Framework.pdf',
-    title: 'Basel III (Tier-1 Common Equity & Stress Scenarios)',
-    type: 'Banking Regulation',
-    content: `%PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> endobj
-4 0 obj << /Length 380 >> stream
-BT
-/F1 12 Tf
-50 720 Td
-(BASEL COMMITTEE ADVISORY: CAPITAL CONSERVATION BUFFER) Tj
-0 -24 Td
-(Risk Controller: Marcus Thorne, Tax ID: 88-9912345, Ext: 4812) Tj
-0 -24 Td
-(Mandate 1: Tier 1 common equity ratio increased to 10.5% for internationally active banks.) Tj
-0 -18 Td
-(Mandate 2: Liquidity Coverage Ratio (LCR) tests must withstand 30-day liquidity shocks.) Tj
-ET
-endstream endobj
-xref
-0 5
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000214 00000 n 
-trailer << /Root 1 0 R /Size 5 >>
-startxref
-640
-%%EOF`
+    label: 'Basel III · capital buffers',
+    lines: [
+      'BASEL COMMITTEE ADVISORY: CAPITAL CONSERVATION AND BUFFER CALIBRATION',
+      'Risk Controller: Marcus Thorne (Tax ID: 88-9912345, Confidential Internal Extension: x4812)',
+      'Scope: Internationally active banks and systemically important deposit-taking institutions.',
+      '[1] Tier 1 common equity ratio requirement is raised to 10.5% for internationally active banks.',
+      '[2] Liquidity Coverage Ratio tests must withstand a 30-day liquidity shock scenario.',
+    ],
   },
   {
     name: 'AML_CFT_FinCEN_Travel_Rule_Revision.pdf',
-    title: 'FinCEN BSA Travel Rule ($250 Threshold & Sanctions)',
-    type: 'AML Enforcement',
-    content: `%PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> endobj
-4 0 obj << /Length 380 >> stream
-BT
-/F1 12 Tf
-50 720 Td
-(FinCEN BSA RULEMAKING: TRAVEL RULE COMPLIANCE) Tj
-0 -24 Td
-(Compliance Certifier: Rebecca Lin, SSN: 000-88-7654, Passport: USA-A89213401) Tj
-0 -24 Td
-(Directive 1: Cross-border transmittal threshold lowered from $3,000 down to $250.) Tj
-0 -18 Td
-(Directive 2: Originator and beneficiary identifiers must be screened against OFAC in real-time.) Tj
-ET
-endstream endobj
-xref
-0 5
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000214 00000 n 
-trailer << /Root 1 0 R /Size 5 >>
-startxref
-640
-%%EOF`
-  }
+    label: 'FinCEN · travel rule revision',
+    lines: [
+      'FinCEN BSA RULEMAKING: TRAVEL RULE COMPLIANCE FOR VIRTUAL FUNDS',
+      'Compliance Certifier: Rebecca Lin (SSN: 000-88-7654, Passport: USA-A89213401)',
+      'Scope: Money services businesses and virtual asset service providers transacting in convertible virtual currency.',
+      '[1] Funds transmittal recordkeeping threshold is lowered from $3,000 to $1,000 for virtual asset transfers.',
+      '[2] Originator and beneficiary identifiers must be screened against sanctions lists in real time.',
+    ],
+  },
 ];
 
-export default function UploadModal({ isOpen, onClose, onSuccess }) {
-  const [file, setFile] = useState(null);
-  const [uploadState, setUploadState] = useState('idle'); // 'idle' | 'uploading' | 'analyzing' | 'done' | 'error'
-  const [progressStage, setProgressStage] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+/** Escapes PDF string special characters. */
+const pdfEscape = (s) => s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
 
-  const onDrop = useCallback((acceptedFiles, rejectedFiles) => {
-    if (rejectedFiles?.length > 0) {
-      const err = rejectedFiles[0].errors[0];
-      if (err.code === 'file-too-large') {
-        toast.error('File exceeds maximum size of 15 MB');
-      } else {
-        toast.error('Only PDF documents are accepted');
-      }
-      return;
-    }
-    if (acceptedFiles?.length > 0) {
-      setFile(acceptedFiles[0]);
-      setErrorMsg('');
-    }
-  }, []);
+/** Build a real, minimal PDF with the given lines of text. */
+function buildPdf(lines) {
+  const content = [
+    'BT',
+    '/F1 12 Tf',
+    '56 750 Td',
+    ...lines.flatMap((line, i) => (i === 0 ? [`(${pdfEscape(line)}) Tj`] : ['0 -26 Td', `(${pdfEscape(line)}) Tj`])),
+    'ET',
+  ].join('\n');
 
-  const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
-    onDrop,
-    accept: { 'application/pdf': ['.pdf'] },
-    maxSize: 15 * 1024 * 1024,
-    multiple: false,
-    disabled: uploadState === 'uploading' || uploadState === 'analyzing',
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+
+  let pdf = '%PDF-1.4\n';
+  const offsets = [];
+  objects.forEach((body, i) => {
+    offsets.push(pdf.length);
+    pdf += `${i + 1} 0 obj\n${body}\nendobj\n`;
   });
 
-  const handleUpload = async () => {
-    if (!file) return;
+  const xrefStart = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.forEach((off) => {
+    pdf += `${String(off).padStart(10, '0')} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
 
-    setUploadState('uploading');
-    setProgressStage('Uploading PDF binary to secure processing queue...');
+  return new Blob([pdf], { type: 'application/pdf' });
+}
 
+let uid = 0;
+
+export default function UploadModal({ isOpen, onClose, onSuccess }) {
+  const [queue, setQueue] = useState([]);
+  const [running, setRunning] = useState(false);
+  const runningRef = useRef(false);
+
+  const update = (id, patch) =>
+    setQueue((q) => q.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+
+  const processOne = async (item) => {
+    update(item.id, { state: 'uploading', message: 'Sending PDF to the API…' });
     try {
-      // Transition message after 1.5s to show AI analysis step
-      setTimeout(() => {
-        setUploadState('analyzing');
-        setProgressStage('Gemini 2.5 Flash scanning document & enforcing PII redaction guardrails...');
-      }, 1500);
+      const res = await researchService.uploadDocument(item.file, (evt) => {
+        if (evt.total) {
+          const pct = Math.round((evt.loaded / evt.total) * 100);
+          update(item.id, { progress: pct });
+        }
+      });
 
-      const res = await researchService.uploadDocument(file);
+      update(item.id, { state: 'analyzing', message: 'Extracting obligations and verifying clauses…' });
+      const count = res.data?.insight?.policyChangeSummary?.length || 0;
+      const verified = res.data?.provenance?.verified ?? 0;
 
-      setUploadState('done');
-      setProgressStage('Analysis complete! Insight logged for human review.');
-      toast.success(`Analysis complete: ${res.data?.insight?.riskLevel} Risk classified`);
-
-      setTimeout(() => {
-        onSuccess?.();
-        handleClose();
-      }, 1200);
+      update(item.id, {
+        state: 'done',
+        progress: 100,
+        message: `${count} obligation${count === 1 ? '' : 's'} · ${verified} clause${verified === 1 ? '' : 's'} verified`,
+        insightId: res.data?.insight?.id,
+      });
+      return true;
     } catch (err) {
-      console.error('Upload failed:', err);
-      setUploadState('error');
-      const msg = err.response?.data?.message || err.message || 'Processing failed';
-      setErrorMsg(msg);
-      toast.error(msg);
+      update(item.id, { state: 'error', message: errorMessage(err) });
+      return false;
     }
   };
 
-  const loadSample = (sample) => {
-    const blob = new Blob([sample.content], { type: 'application/pdf' });
-    const sampleFile = new File([blob], sample.name, { type: 'application/pdf' });
-    setFile(sampleFile);
-    setErrorMsg('');
-    toast.success(`Loaded sample: ${sample.name}`);
+  const runQueue = useCallback(
+    async (items) => {
+      if (runningRef.current) return;
+      runningRef.current = true;
+      setRunning(true);
+
+      let ok = 0;
+      for (const item of items) {
+        // eslint-disable-next-line no-await-in-loop
+        if (await processOne(item)) ok++;
+      }
+
+      runningRef.current = false;
+      setRunning(false);
+      if (ok > 0) {
+        onSuccess?.();
+        toast.success(`${ok} document${ok === 1 ? '' : 's'} analysed`);
+      }
+    },
+    [onSuccess]
+  );
+
+  const addFiles = (files) => {
+    const accepted = [];
+    const rejected = [];
+
+    files.forEach((file) => {
+      if (file.type !== 'application/pdf') rejected.push(`${file.name}: not a PDF`);
+      else if (file.size > MAX_MB * 1024 * 1024) rejected.push(`${file.name}: over ${MAX_MB} MB`);
+      else if (file.size === 0) rejected.push(`${file.name}: file is empty`);
+      else accepted.push(file);
+    });
+
+    if (rejected.length) {
+      rejected.slice(0, 3).forEach((r) => toast.error(r));
+    }
+    if (!accepted.length) return;
+
+    const items = accepted.slice(0, MAX_FILES).map((file) => ({
+      id: `f${++uid}`,
+      file,
+      name: file.name,
+      size: file.size,
+      state: 'queued',
+      message: 'Waiting…',
+      progress: 0,
+    }));
+
+    setQueue((q) => [...q, ...items]);
+    // Kick off after the state update has been applied.
+    setTimeout(() => runQueue(items), 0);
   };
 
-  const handleClose = () => {
-    if (uploadState === 'uploading' || uploadState === 'analyzing') return;
-    setFile(null);
-    setUploadState('idle');
-    setProgressStage('');
-    setErrorMsg('');
+  const onDrop = useCallback(
+    (accepted, rejections) => {
+      if (rejections?.length) {
+        rejections.slice(0, 3).forEach((r) => {
+          const code = r.errors?.[0]?.code;
+          toast.error(code === 'file-too-large' ? `${r.file.name}: over ${MAX_MB} MB` : `${r.file.name}: only PDFs are accepted`);
+        });
+      }
+      if (accepted?.length) addFiles(accepted);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { 'application/pdf': ['.pdf'] },
+    maxSize: MAX_MB * 1024 * 1024,
+    multiple: true,
+    noClick: false,
+  });
+
+  const loadSample = (sample) => {
+    const blob = buildPdf(sample.lines);
+    const file = new File([blob], sample.name, { type: 'application/pdf' });
+    addFiles([file]);
+  };
+
+  const retry = (item) => {
+    update(item.id, { state: 'queued', message: 'Retrying…', progress: 0 });
+    setTimeout(() => runQueue([{ ...item, state: 'queued' }]), 0);
+  };
+
+  const close = () => {
+    if (running) return;
+    setQueue([]);
     onClose();
   };
 
   if (!isOpen) return null;
 
+  const done = queue.filter((q) => q.state === 'done').length;
+  const failed = queue.filter((q) => q.state === 'error').length;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl animate-fadeIn">
-      <div className="relative w-full max-w-2xl bg-[#0a0a0c] border border-white/[0.08] rounded-sm shadow-2xl p-6 md:p-8 overflow-hidden">
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Upload circulars"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !running) close();
+      }}
+    >
+      <div className="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-lg bg-forge-dark border border-forge-border shadow-lift" style={{ borderColor: '#252a3a' }}>
         {/* Header */}
-        <div className="flex items-center justify-between pb-5 border-b border-white/[0.06]">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-sm bg-forge-accent/10 border border-forge-accent/30 flex items-center justify-center text-forge-accent">
-              <UploadCloud className="w-4 h-4" />
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 p-5 border-b border-forge-border bg-forge-dark/95 backdrop-blur" style={{ borderColor: '#252a3a' }}>
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded bg-forge-accent/10 border border-forge-accent/30 flex items-center justify-center">
+              <UploadCloud className="w-4 h-4 text-forge-accent" />
             </div>
             <div>
-              <h2 className="font-serif text-xl text-white tracking-wide">Ingest Regulatory Document (PDF)</h2>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-forge-muted font-sans mt-0.5">Zero-Disk Memory Pipeline · Gemini 2.5 Flash</p>
+              <h2 className="font-serif text-lg text-forge-cream">Ingest regulatory circulars</h2>
+              <p className="text-2xs text-forge-dim mt-0.5">
+                PDF only · up to {MAX_MB} MB each · processed in memory
+              </p>
             </div>
           </div>
           <button
-            onClick={handleClose}
-            disabled={uploadState === 'uploading' || uploadState === 'analyzing'}
-            className="p-1.5 text-forge-muted hover:text-white rounded hover:bg-white/[0.05] transition-colors disabled:opacity-50"
+            onClick={close}
+            disabled={running}
+            className="p-2 rounded text-forge-dim hover:text-forge-text hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label="Close"
+            title={running ? 'Processing in progress' : 'Close'}
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="py-6 space-y-6">
-          {/* Dropzone */}
+        <div className="p-5 space-y-5">
+          {/* Drop zone - always visible */}
           <div
             {...getRootProps()}
-            className={`border border-dashed rounded-sm p-8 text-center cursor-pointer transition-all duration-300 ${
+            className={`rounded-lg border-2 border-dashed p-8 text-center cursor-pointer transition-all ${
               isDragActive
-                ? 'border-forge-accent bg-forge-accent/10 scale-[0.99]'
-                : isDragReject
-                ? 'border-rose-500 bg-rose-500/10'
-                : file
-                ? 'border-emerald-500/40 bg-emerald-500/5'
-                : 'border-white/15 bg-white/[0.015] hover:border-forge-accent/50 hover:bg-white/[0.03]'
+                ? 'border-forge-accent bg-forge-accent/10 scale-[0.995]'
+                : 'border-forge-border hover:border-forge-accent/50 hover:bg-white/[0.02]'
             }`}
+            style={!isDragActive ? { borderColor: '#2f3548' } : undefined}
           >
             <input {...getInputProps()} />
-
-            {file ? (
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-12 h-12 rounded-sm bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                  <FileCheck className="w-6 h-6" />
-                </div>
-                <div className="font-serif text-base text-white">{file.name}</div>
-                <div className="text-xs font-mono text-forge-muted">{(file.size / 1024).toFixed(1)} KB · Ingestion Buffer Ready</div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setFile(null);
-                  }}
-                  className="mt-2 text-xs text-rose-400 hover:underline uppercase tracking-wider font-mono"
-                >
-                  Change file
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-12 h-12 rounded-sm bg-forge-accent/10 border border-forge-accent/25 flex items-center justify-center text-forge-accent">
-                  <UploadCloud className="w-6 h-6" />
-                </div>
-                <div className="font-serif text-base text-white">
-                  {isDragActive ? 'Drop regulatory PDF stream...' : 'Select or drop regulatory PDF'}
-                </div>
-                <div className="text-[11px] text-forge-muted font-sans">Complies with FIPS 140-3 in-memory zero-disk streaming standard (Up to 15 MB)</div>
-              </div>
-            )}
+            <div className="w-12 h-12 mx-auto rounded-lg bg-forge-accent/10 border border-forge-accent/25 flex items-center justify-center mb-3">
+              <UploadCloud className="w-5 h-5 text-forge-accent" />
+            </div>
+            <p className="text-sm text-forge-text font-medium mb-1">
+              {isDragActive ? 'Drop your PDFs here' : 'Drop PDFs here, or click to browse'}
+            </p>
+            <p className="text-2xs text-forge-dim">
+              You can add several circulars at once. Each one is analysed on its own.
+            </p>
           </div>
 
-          {/* Quick-Pick Pre-loaded Real Regulatory Samples */}
+          {/* Samples */}
           <div>
-            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] font-sans text-forge-muted mb-3">
+            <div className="flex items-center gap-2 mb-2.5">
               <Sparkles className="w-3.5 h-3.5 text-forge-accent" />
-              <span>Or choose a pre-loaded regulatory sample:</span>
+              <span className="text-2xs uppercase tracking-[0.16em] text-forge-dim">
+                Or try a built-in sample circular
+              </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {PRELOADED_SAMPLES.map((s, idx) => (
+            <div className="grid sm:grid-cols-2 gap-2">
+              {SAMPLE_PDFS.map((s) => (
                 <button
-                  key={idx}
-                  type="button"
+                  key={s.name}
                   onClick={() => loadSample(s)}
-                  disabled={uploadState === 'uploading' || uploadState === 'analyzing'}
-                  className="text-left p-3 rounded-sm bg-[#111114] hover:bg-[#15151a] border border-white/[0.05] hover:border-forge-accent/40 transition-all flex items-start gap-2.5 text-xs group disabled:opacity-40"
+                  disabled={running}
+                  className="text-left p-2.5 rounded bg-forge-card border border-forge-border hover:border-forge-accent/40 transition-colors flex items-start gap-2 disabled:opacity-50"
+                  style={{ borderColor: '#252a3a' }}
                 >
-                  <FileText className="w-4 h-4 text-forge-accent mt-0.5 shrink-0 group-hover:scale-110 transition-transform" />
-                  <div className="overflow-hidden">
-                    <div className="font-medium text-white/90 truncate font-sans">{s.title}</div>
-                    <div className="text-[10px] text-forge-muted font-mono">{s.type}</div>
-                  </div>
+                  <FileText className="w-3.5 h-3.5 text-forge-accent mt-0.5 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block text-xs text-forge-text truncate">{s.label}</span>
+                    <span className="block text-3xs text-forge-dim">Synthetic sample</span>
+                  </span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Progressive Loading State */}
-          {(uploadState === 'uploading' || uploadState === 'analyzing' || uploadState === 'done') && (
-            <div className="p-4 rounded-sm bg-[#0e0e12] border border-forge-accent/30 space-y-3">
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2 font-medium text-forge-cream">
-                  {uploadState === 'done' ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  ) : (
-                    <Loader2 className="w-4 h-4 animate-spin text-forge-accent" />
-                  )}
-                  <span className="font-sans text-xs">{progressStage}</span>
-                </div>
-                <span className="text-forge-muted text-[11px] font-mono">
-                  {uploadState === 'uploading' ? '40%' : uploadState === 'analyzing' ? '85%' : '100%'}
+          {/* Queue */}
+          {queue.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-2xs uppercase tracking-[0.16em] text-forge-dim">
+                  Queue · {done} done{failed ? ` · ${failed} failed` : ''}
                 </span>
+                {!running && (
+                  <button
+                    onClick={() => setQueue([])}
+                    className="text-2xs text-forge-dim hover:text-coral transition-colors inline-flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3 h-3" /> Clear
+                  </button>
+                )}
               </div>
 
-              {/* Progress bar */}
-              <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-700 ease-out ${
-                    uploadState === 'done'
-                      ? 'w-full bg-emerald-400'
-                      : uploadState === 'analyzing'
-                      ? 'w-[85%] bg-forge-accent animate-pulse'
-                      : 'w-[40%] bg-white/70'
-                  }`}
-                />
-              </div>
+              {queue.map((item) => (
+                <div key={item.id} className="p-3 rounded bg-forge-card border border-forge-border" style={{ borderColor: '#252a3a' }}>
+                  <div className="flex items-center gap-2.5">
+                    <StateIcon state={item.state} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs text-forge-text truncate">{item.name}</div>
+                      <div className={`text-3xs truncate ${item.state === 'error' ? 'text-coral' : 'text-forge-dim'}`}>
+                        {item.message}
+                      </div>
+                    </div>
+                    <span className="text-3xs font-mono text-forge-dim shrink-0">
+                      {(item.size / 1024).toFixed(0)} KB
+                    </span>
+                    {item.state === 'error' && (
+                      <button
+                        onClick={() => retry(item)}
+                        className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded border border-forge-border text-3xs text-forge-muted hover:text-forge-gold hover:border-forge-accent/50 transition-colors"
+                        style={{ borderColor: '#252a3a' }}
+                      >
+                        <RefreshCw className="w-3 h-3" /> Retry
+                      </button>
+                    )}
+                  </div>
 
-              {/* Guardrails checklist indicator */}
-              <div className="grid grid-cols-3 gap-2 text-[10px] font-mono text-forge-muted pt-1">
-                <div className="flex items-center gap-1 text-emerald-400">
-                  <CheckCircle2 className="w-3 h-3" />
-                  <span>Base64 Stream</span>
+                  {(item.state === 'uploading' || item.state === 'analyzing') && (
+                    <div className="mt-2 h-1 rounded-full bg-forge-black overflow-hidden">
+                      <div
+                        className="h-full bg-forge-accent transition-all duration-300"
+                        style={{ width: `${item.state === 'analyzing' ? 88 : Math.max(item.progress, 8)}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
-                <div className={`flex items-center gap-1 ${uploadState === 'analyzing' || uploadState === 'done' ? 'text-emerald-400' : 'text-forge-muted/60'}`}>
-                  {uploadState === 'analyzing' ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
-                  <span>PII Masking</span>
-                </div>
-                <div className={`flex items-center gap-1 ${uploadState === 'done' ? 'text-emerald-400' : 'text-forge-muted/60'}`}>
-                  {uploadState === 'done' ? <CheckCircle2 className="w-3 h-3" /> : <Loader2 className="w-3 h-3 opacity-40" />}
-                  <span>Mandate Extracted</span>
-                </div>
-              </div>
+              ))}
             </div>
           )}
 
-          {/* Error Message */}
-          {errorMsg && (
-            <div className="flex items-center gap-2 p-3 rounded-sm bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-mono">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
+          <div className="flex items-start gap-2 p-3 rounded bg-forge-black border border-forge-border" style={{ borderColor: '#252a3a' }}>
+            <ShieldCheck className="w-3.5 h-3.5 text-mint mt-0.5 shrink-0" />
+            <p className="text-3xs text-forge-dim leading-relaxed">
+              Files are held in memory for the duration of the request and are never written to
+              disk. Extracted text is scanned for PII by a deterministic regex guard after the
+              model runs, and every quoted clause is checked against the PDF text layer.
+            </p>
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 pt-5 border-t border-white/[0.06]">
-          <button
-            type="button"
-            onClick={handleClose}
-            disabled={uploadState === 'uploading' || uploadState === 'analyzing'}
-            className="px-5 py-2.5 text-[11px] uppercase tracking-[0.2em] font-sans text-forge-muted hover:text-white transition-colors disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleUpload}
-            disabled={!file || uploadState === 'uploading' || uploadState === 'analyzing'}
-            className="flex items-center gap-2 px-6 py-2.5 text-[11px] uppercase tracking-[0.2em] font-sans font-semibold text-black bg-white hover:bg-forge-cream rounded-sm shadow-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-100"
-          >
-            {uploadState === 'uploading' || uploadState === 'analyzing' ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Processing...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Run Ingestion Engine</span>
-              </>
-            )}
+        <div className="sticky bottom-0 flex items-center justify-between gap-3 p-5 border-t border-forge-border bg-forge-dark/95 backdrop-blur" style={{ borderColor: '#252a3a' }}>
+          <span className="text-2xs text-forge-dim">
+            {running ? 'Processing… you can leave this open.' : 'Nothing is committed until an administrator decides.'}
+          </span>
+          <button onClick={close} disabled={running} className="btn-ghost !py-2.5 !px-5 !text-2xs">
+            {done > 0 && !running ? 'Done' : 'Close'}
           </button>
         </div>
       </div>
     </div>
   );
+}
+
+function StateIcon({ state }) {
+  if (state === 'done') return <CheckCircle2 className="w-4 h-4 text-mint shrink-0" />;
+  if (state === 'error') return <AlertTriangle className="w-4 h-4 text-coral shrink-0" />;
+  if (state === 'uploading' || state === 'analyzing') return <Loader2 className="w-4 h-4 text-forge-accent animate-spin shrink-0" />;
+  return <FileText className="w-4 h-4 text-forge-dim shrink-0" />;
 }

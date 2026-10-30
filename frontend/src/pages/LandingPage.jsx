@@ -1,572 +1,732 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  Shield,
-  ArrowRight,
-  ChevronDown,
-  Zap,
-  Eye,
-  Lock,
-  FileText,
-  Brain,
-  CheckCircle,
-  ExternalLink,
-  Sparkles,
-  Sliders,
-  Database,
-  KeyRound,
-  Terminal,
+  ArrowRight, ChevronDown, ShieldCheck, FileSearch, UserCheck, Link2,
+  Lock, ScrollText, AlertTriangle, CheckCircle2, XCircle, Database,
+  Brain, Download, Fingerprint, Server, Sparkles, Terminal,
 } from 'lucide-react';
-import { useScrollReveal } from '../hooks/useScrollReveal';
 
-function RevealSection({ children, className = '', delay = '' }) {
-  const [ref, isVisible] = useScrollReveal();
+/* ────────────────────────────────────────────────────────────────
+   Scroll helpers
+   ──────────────────────────────────────────────────────────────── */
+
+function useReveal(options = {}) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    // Fall back to "visible" when IntersectionObserver is unavailable so the
+    // page is never blank on an old browser.
+    if (typeof IntersectionObserver === 'undefined') {
+      setVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.unobserve(entry.target);
+        }
+      },
+      { threshold: options.threshold ?? 0.15, rootMargin: options.rootMargin ?? '0px 0px -8% 0px' }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [options.threshold, options.rootMargin]);
+
+  return [ref, visible];
+}
+
+function Reveal({ children, className = '', delay = '', variant = '' }) {
+  const [ref, visible] = useReveal();
   return (
-    <div ref={ref} className={`reveal ${delay} ${isVisible ? 'visible' : ''} ${className}`}>
+    <div ref={ref} className={`reveal ${variant} ${delay} ${visible ? 'visible' : ''} ${className}`}>
       {children}
     </div>
   );
 }
 
-function Counter({ end, duration = 2000, suffix = '' }) {
-  const [count, setCount] = useState(0);
-  const [ref, isVisible] = useScrollReveal();
+function CountUp({ to, suffix = '', duration = 1400 }) {
+  const [value, setValue] = useState(0);
+  const [ref, visible] = useReveal({ threshold: 0.4 });
 
   useEffect(() => {
-    if (!isVisible) return;
-    let start = 0;
-    const step = end / (duration / 16);
-    const timer = setInterval(() => {
-      start += step;
-      if (start >= end) {
-        setCount(end);
-        clearInterval(timer);
-      } else {
-        setCount(Math.floor(start));
-      }
-    }, 16);
-    return () => clearInterval(timer);
-  }, [isVisible, end, duration]);
+    if (!visible) return;
+    let frame;
+    const start = performance.now();
+    const tick = (now) => {
+      const progress = Math.min((now - start) / duration, 1);
+      setValue(Math.round(to * (1 - Math.pow(1 - progress, 3))));
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [visible, to, duration]);
 
-  return <span ref={ref}>{count}{suffix}</span>;
+  return (
+    <span ref={ref}>
+      {value}
+      {suffix}
+    </span>
+  );
 }
+
+/* ────────────────────────────────────────────────────────────────
+   Page
+   ──────────────────────────────────────────────────────────────── */
 
 export default function LandingPage({ onEnterApp, isAuthenticated, user }) {
   const [scrollY, setScrollY] = useState(0);
+  const [progress, setProgress] = useState(0);
   const [navSolid, setNavSolid] = useState(false);
-  const [activeSlide, setActiveSlide] = useState(1);
   const [simStep, setSimStep] = useState(0);
-  const [isSimulating, setIsSimulating] = useState(false);
+  const [simRunning, setSimRunning] = useState(false);
+  const timers = useRef([]);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrollY(window.scrollY);
-      setNavSolid(window.scrollY > 50);
+    const onScroll = () => {
+      const y = window.scrollY;
+      setScrollY(y);
+      setNavSolid(y > 40);
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      setProgress(max > 0 ? Math.min((y / max) * 100, 100) : 0);
     };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      timers.current.forEach(clearTimeout);
+    };
   }, []);
 
-  const scrollToSection = (id) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const runSimulation = () => {
-    if (isSimulating) return;
-    setIsSimulating(true);
+    if (simRunning) return;
+    timers.current.forEach(clearTimeout);
+    setSimRunning(true);
     setSimStep(1);
-    setTimeout(() => setSimStep(2), 1200);
-    setTimeout(() => setSimStep(3), 2400);
-    setTimeout(() => setSimStep(4), 3600);
-    setTimeout(() => {
-      setSimStep(5);
-      setIsSimulating(false);
-    }, 4800);
+    [2, 3, 4, 5].forEach((step, i) => {
+      timers.current.push(setTimeout(() => setSimStep(step), 900 * (i + 1)));
+    });
+    timers.current.push(
+      setTimeout(() => {
+        setSimRunning(false);
+      }, 4600)
+    );
   };
 
+  const heroFade = Math.max(0, 1 - scrollY / 620);
+  const heroShift = Math.min(scrollY * 0.28, 180);
+
   return (
-    <div className="bg-[#050505] text-white grain-overlay min-h-screen selection:bg-forge-accent/20 selection:text-white font-sans antialiased overflow-x-hidden">
-      {/* ─── FIXED LUXURY MINIMALIST HEADER ─── */}
+    <div className="bg-forge-black text-forge-text font-sans overflow-x-hidden">
+      <div className="scroll-progress" style={{ width: `${progress}%` }} />
+
+      {/* ── NAV ─────────────────────────────────────────────── */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 ${
+        className={`fixed top-0 inset-x-0 z-50 transition-all duration-500 ${
           navSolid
-            ? 'bg-[#050505]/95 backdrop-blur-2xl border-b border-white/[0.05] py-4'
-            : 'bg-transparent py-6'
+            ? 'bg-forge-black/90 backdrop-blur-xl border-b border-forge-border py-3'
+            : 'bg-transparent py-5'
         }`}
+        style={navSolid ? { borderColor: '#252a3a' } : undefined}
       >
-        <div className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between">
-          {/* Left subtle indicator */}
-          <div className="flex items-center gap-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-forge-accent animate-pulse-soft" />
-            <span className="text-[10px] uppercase tracking-[0.25em] text-forge-muted font-sans hidden sm:inline-block">
-              Apex RegTech 2026
+        <div className="max-w-7xl mx-auto px-5 md:px-8 flex items-center justify-between gap-4">
+          <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="flex items-center gap-2.5 group">
+            <span className="w-8 h-8 rounded border border-forge-accent/40 flex items-center justify-center group-hover:border-forge-accent transition-colors">
+              <span className="text-forge-accent font-serif">§</span>
             </span>
+            <span className="font-serif text-base text-forge-cream tracking-wide">RegTech Intelligence</span>
+          </button>
+
+          <div className="hidden md:flex items-center gap-7 text-2xs uppercase tracking-[0.18em] text-forge-muted">
+            <button onClick={() => scrollTo('problem')} className="hover:text-forge-gold transition-colors">Problem</button>
+            <button onClick={() => scrollTo('how')} className="hover:text-forge-gold transition-colors">How it works</button>
+            <button onClick={() => scrollTo('governance')} className="hover:text-forge-gold transition-colors">Governance</button>
+            <button onClick={() => scrollTo('proof')} className="hover:text-forge-gold transition-colors">Proof</button>
           </div>
 
-          {/* Centered Luxury Apex Emblem (Identical to reference screenshot style) */}
-          <div className="flex flex-col items-center cursor-pointer group" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <div className="flex items-center justify-center w-7 h-7 text-white group-hover:text-forge-accent transition-colors duration-500">
-              {/* Minimalist Apex Glyph */}
-              <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                <path d="M12 2L1 21h4.5l6.5-12 6.5 12H23L12 2z" />
-              </svg>
-            </div>
-            <span className="font-serif text-[13px] tracking-[0.25em] uppercase text-white mt-1">
-              Apex
-            </span>
-          </div>
-
-          {/* Right Navigation & CTAs */}
-          <div className="flex items-center gap-6 md:gap-8">
-            <div className="hidden md:flex items-center gap-8 text-[11px] uppercase tracking-[0.2em] font-sans text-forge-muted">
-              <button onClick={() => scrollToSection('approach')} className="hover:text-white transition-colors duration-300 hover-line pb-1">Approach</button>
-              <button onClick={() => scrollToSection('insight')} className="hover:text-white transition-colors duration-300 hover-line pb-1">Insight</button>
-              <button onClick={() => scrollToSection('architecture')} className="hover:text-white transition-colors duration-300 hover-line pb-1">Architecture</button>
-            </div>
-
-            <button
-              onClick={onEnterApp}
-              className="group relative px-5 py-2.5 border border-white/20 hover:border-forge-accent/70 text-[10px] md:text-[11px] uppercase tracking-[0.25em] font-sans transition-all duration-500 bg-black/40 hover:bg-forge-accent/10 flex items-center gap-2"
-            >
-              <span>{isAuthenticated ? `Console (${user?.username || 'Active'})` : 'Research Console'}</span>
-              <ArrowRight className="w-3 h-3 text-forge-accent group-hover:translate-x-1 transition-transform duration-300" />
-            </button>
-          </div>
+          <button onClick={onEnterApp} className="btn-primary !py-2.5 !px-5 !text-2xs">
+            <span>{isAuthenticated ? `Console · ${user?.username || 'you'}` : 'Open console'}</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
         </div>
       </nav>
 
-      {/* ─── HERO SECTION: "For Those Who Refuse Ordinary" ─── */}
-      <section className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-32 pb-20 bg-texture overflow-hidden">
-        {/* Subtle cinematic radial backlights */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[550px] bg-forge-accent/[0.035] blur-[170px] rounded-full pointer-events-none" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-rose-500/[0.015] blur-[140px] rounded-full pointer-events-none" />
+      {/* ── HERO (centered) ─────────────────────────────────── */}
+      <section className="relative min-h-[100svh] flex flex-col items-center justify-center text-center px-5 pt-28 pb-16">
+        <div className="absolute inset-0 bg-texture" />
+        <div className="absolute inset-0 grid-lines opacity-70" aria-hidden="true" />
+        <div
+          className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[620px] h-[620px] rounded-full blur-[150px] pointer-events-none animate-glow-drift"
+          style={{ background: 'radial-gradient(circle, rgba(232,180,100,0.16), transparent 65%)', opacity: heroFade }}
+          aria-hidden="true"
+        />
 
-        <div className="relative z-10 text-center max-w-5xl mx-auto w-full">
-          {/* Subtle micro tag */}
-          <div className="overflow-hidden mb-6">
-            <p className="text-[11px] uppercase tracking-[0.35em] text-forge-muted font-sans animate-fade-in inline-block border-b border-forge-accent/20 pb-1">
-              Autonomous Compliance Engineering
-            </p>
+        <div
+          className="relative z-10 max-w-4xl mx-auto"
+          style={{ opacity: heroFade, transform: `translateY(${heroShift * 0.25}px)` }}
+        >
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-forge-accent/30 bg-forge-accent/[0.06] mb-8 animate-fade-in">
+            <span className="w-1.5 h-1.5 rounded-full bg-mint animate-pulse-soft" />
+            <span className="text-2xs uppercase tracking-[0.2em] text-forge-gold">
+              AI Security, Privacy &amp; Trust
+            </span>
           </div>
 
-          {/* Grand bespoke serif heading (Reference Screenshot 2 & 3 exact aesthetic) */}
-          <div className="overflow-hidden mb-6">
-            <h1 className="font-serif text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-normal leading-[1.0] tracking-tight text-white animate-fade-in-up">
-              For Those Who<br />
-              <span className="italic font-light text-[#f5f0e8]">Refuse Ordinary</span>
-            </h1>
-          </div>
+          <h1 className="font-serif text-[2.7rem] sm:text-6xl md:text-7xl lg:text-[5.2rem] leading-[1.02] tracking-tight text-white mb-7 animate-fade-in-up">
+            The AI proposes.
+            <br />
+            <span className="text-gradient-gold italic">A human decides.</span>
+            <br />
+            <span className="text-forge-text/90">The system proves both.</span>
+          </h1>
 
-          <div className="overflow-hidden max-w-xl mx-auto mb-14">
-            <p className="text-xs md:text-sm text-forge-muted font-sans tracking-[0.12em] leading-relaxed animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-              BESPOKE REGULATORY INTELLIGENCE CRAFTED FOR ABSOLUTE COMPLIANCE & IMMUNITY
-            </p>
-          </div>
+          <p className="text-base md:text-lg text-forge-muted max-w-2xl mx-auto leading-relaxed mb-10 animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
+            Regulatory circulars in. Verifiable obligations out. Every quote checked against the
+            source PDF, every decision signed by a named administrator and sealed into a
+            hash-chained audit ledger.
+          </p>
 
-          {/* ─── TRIO OF OBSIDIAN MONOLITH SHOWCASES (Mirroring the 3 vehicles on asphalt from Screenshot 2) ─── */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-16 text-left">
-            {/* Monolith 1: Ingestion Core */}
-            <div className="group relative bg-[#0b0b0d] border border-white/[0.07] hover:border-forge-accent/40 p-8 rounded-sm transition-all duration-700 hover:-translate-y-1 hover:shadow-2xl hover:shadow-black">
-              <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent group-hover:via-forge-accent/50 transition-all duration-700" />
-              <div className="flex items-center justify-between mb-8">
-                <span className="text-[10px] font-mono text-forge-muted/50 tracking-widest">01 / CORE</span>
-                <Database className="w-4 h-4 text-forge-muted/60 group-hover:text-forge-accent transition-colors" />
-              </div>
-              <h3 className="font-serif text-2xl text-white mb-2 group-hover:text-forge-cream transition-colors">
-                Zero-Disk Buffer
-              </h3>
-              <p className="text-xs text-forge-muted leading-relaxed mb-6 font-sans">
-                Memory-only PDF parsing stream. FIPS 140-3 cryptographic sanitization with zero filesystem residue or leak vectors.
-              </p>
-              <div className="text-[10px] uppercase tracking-[0.2em] font-mono text-forge-accent/80 flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-forge-accent" />
-                <span>Streaming Ingestion</span>
-              </div>
-            </div>
-
-            {/* Monolith 2: The Red Racing Engine (GT3 RS analog from Screenshot 2) */}
-            <div className="group relative bg-[#0d090a] border border-rose-500/20 hover:border-rose-500/50 p-8 rounded-sm transition-all duration-700 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-rose-950/20">
-              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-rose-500/20 via-rose-500 to-rose-500/20 group-hover:via-rose-400 transition-all duration-700" />
-              <div className="flex items-center justify-between mb-8">
-                <span className="text-[10px] font-mono text-rose-400/70 tracking-widest">02 / REASONING</span>
-                <Brain className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
-              </div>
-              <h3 className="font-serif text-2xl text-white mb-2 group-hover:text-rose-100 transition-colors">
-                Gemini 2.5 Flash
-              </h3>
-              <p className="text-xs text-rose-100/70 leading-relaxed mb-6 font-sans">
-                Sub-second structural extraction of policy mandates, risk vectors, punitive thresholds, and verbatim regulatory clauses.
-              </p>
-              <div className="text-[10px] uppercase tracking-[0.2em] font-mono text-rose-400 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-                <span>Ultra-Low Latency</span>
-              </div>
-            </div>
-
-            {/* Monolith 3: Immutable Provenance */}
-            <div className="group relative bg-[#0b0b0d] border border-white/[0.07] hover:border-forge-accent/40 p-8 rounded-sm transition-all duration-700 hover:-translate-y-1 hover:shadow-2xl hover:shadow-black">
-              <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent group-hover:via-forge-accent/50 transition-all duration-700" />
-              <div className="flex items-center justify-between mb-8">
-                <span className="text-[10px] font-mono text-forge-muted/50 tracking-widest">03 / PROVENANCE</span>
-                <Lock className="w-4 h-4 text-forge-muted/60 group-hover:text-forge-accent transition-colors" />
-              </div>
-              <h3 className="font-serif text-2xl text-white mb-2 group-hover:text-forge-cream transition-colors">
-                SHA-256 Ledger
-              </h3>
-              <p className="text-xs text-forge-muted leading-relaxed mb-6 font-sans">
-                Cryptographic audit trail. Human sign-off approvals are hashed into a tamper-evident chain for internal and external auditors.
-              </p>
-              <div className="text-[10px] uppercase tracking-[0.2em] font-mono text-forge-accent/80 flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-forge-accent" />
-                <span>Zero-Tamper Chain</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Row */}
-          <div className="flex flex-wrap items-center justify-center gap-5">
-            <button
-              onClick={onEnterApp}
-              className="px-9 py-4 bg-white text-black hover:bg-forge-cream font-sans text-[11px] uppercase tracking-[0.25em] font-semibold transition-all duration-300 shadow-xl shadow-white/5 hover:scale-[1.02]"
-            >
-              Launch Research Console
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-14">
+            <button onClick={onEnterApp} className="btn-primary w-full sm:w-auto animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
+              {isAuthenticated ? 'Enter the console' : 'Try the live console'}
+              <ArrowRight className="w-4 h-4" />
             </button>
-            <button
-              onClick={() => scrollToSection('approach')}
-              className="px-9 py-4 border border-white/20 hover:border-white/50 text-white font-sans text-[11px] uppercase tracking-[0.25em] transition-all duration-300 hover:bg-white/[0.03]"
-            >
-              Explore Architecture
+            <button onClick={() => scrollTo('how')} className="btn-ghost w-full sm:w-auto">
+              See how it works
+              <ChevronDown className="w-4 h-4" />
             </button>
           </div>
-        </div>
 
-        {/* Scroll Indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-float cursor-pointer" onClick={() => scrollToSection('philosophy')}>
-          <ChevronDown className="w-4 h-4 text-forge-muted/40 hover:text-white transition-colors" />
-        </div>
-      </section>
-
-      {/* ─── PHILOSOPHICAL MANIFESTO (Screenshot 4 exact aesthetic) ─── */}
-      <section id="philosophy" className="relative py-36 md:py-48 bg-[#070708] border-t border-b border-white/[0.04] text-center px-6">
-        <RevealSection className="max-w-4xl mx-auto">
-          <p className="text-[10px] uppercase tracking-[0.35em] text-forge-accent/70 font-sans mb-8">
-            The Apex Creed
-          </p>
-          <h2 className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-normal leading-[1.1] tracking-tight text-white mb-8">
-            We Don't Modify Regulations<br />
-            <span className="italic font-light text-forge-cream">We Build Immunity</span> For You
-          </h2>
-          <div className="luxury-divider max-w-xs mx-auto my-10" />
-          <p className="text-xs md:text-sm text-forge-muted font-sans tracking-[0.15em] uppercase max-w-xl mx-auto leading-relaxed">
-            Form follows precision. Every mandate, risk classification, and audit receipt is verified with zero tolerance for ambiguity.
-          </p>
-        </RevealSection>
-      </section>
-
-      {/* ─── INSIGHT SHOWCASE (Screenshot 1 exact aesthetic: "02 / 03 Insight") ─── */}
-      <section id="insight" className="relative py-28 md:py-36 bg-[#050505]">
-        <div className="max-w-7xl mx-auto px-6 md:px-12">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
-            {/* Left Column (Screenshot 1: Dark Fine-Bordered Frame with macro inspection visual) */}
-            <div className="lg:col-span-7">
-              <RevealSection>
-                <div className="relative bg-[#09090b] border border-white/[0.08] p-8 md:p-10 rounded-sm overflow-hidden group">
-                  {/* Fine edge highlight */}
-                  <div className="absolute top-0 left-0 w-24 h-[1px] bg-forge-accent" />
-                  <div className="absolute top-0 left-0 w-[1px] h-24 bg-forge-accent" />
-
-                  {/* Header inside card */}
-                  <div className="flex items-center justify-between pb-6 border-b border-white/[0.05] mb-6">
-                    <div className="flex items-center gap-3">
-                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-                      <span className="text-[10px] uppercase tracking-[0.2em] font-mono text-rose-400">
-                        Critical Mandate Vector
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-mono text-forge-muted/60">
-                      FINRA Notice 26-08 • p. 4
-                    </span>
-                  </div>
-
-                  {/* Document preview simulation */}
-                  <div className="space-y-5">
-                    <div className="bg-[#111114] border border-white/[0.04] p-5 rounded-sm">
-                      <div className="text-[10px] uppercase tracking-wider text-forge-muted/50 mb-1 font-mono">
-                        Obligation Text
-                      </div>
-                      <p className="font-serif text-lg text-white/95 leading-relaxed">
-                        "Broker-dealers deploying algorithmic execution systems must conduct semi-annual stress simulations under stressed liquidity scenarios."
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
-                      <div className="bg-[#111114] p-3 border border-white/[0.04]">
-                        <span className="text-[9px] uppercase tracking-wider text-forge-muted font-mono block mb-1">Risk Severity</span>
-                        <span className="text-xs font-bold uppercase tracking-wider text-rose-400">High Risk</span>
-                      </div>
-                      <div className="bg-[#111114] p-3 border border-white/[0.04]">
-                        <span className="text-[9px] uppercase tracking-wider text-forge-muted font-mono block mb-1">PII Status</span>
-                        <span className="text-xs font-mono text-emerald-400 flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3" /> Sanitized
-                        </span>
-                      </div>
-                      <div className="bg-[#111114] p-3 border border-white/[0.04] col-span-2 sm:col-span-1">
-                        <span className="text-[9px] uppercase tracking-wider text-forge-muted font-mono block mb-1">Provenance Hash</span>
-                        <span className="text-[10px] font-mono text-forge-accent truncate block">7f8c2b9a1...</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Corner indicator */}
-                  <div className="mt-8 pt-4 border-t border-white/[0.05] flex items-center justify-between text-[10px] font-mono text-forge-muted/50">
-                    <span>FIPS 140-3 CRYPTOGRAPHIC ATTESTATION</span>
-                    <span>CONFIDENTIAL</span>
-                  </div>
-                </div>
-              </RevealSection>
-            </div>
-
-            {/* Right Column (Screenshot 1: "02 / 03 Insight" + Editorial Typography) */}
-            <div className="lg:col-span-5">
-              <RevealSection delay="reveal-delay-1">
-                {/* 02 / 03 Tag */}
-                <div className="text-[11px] uppercase tracking-[0.35em] text-forge-accent font-sans mb-4">
-                  02 / 03
-                </div>
-
-                {/* Big Luxury Title: Insight */}
-                <h2 className="font-serif text-5xl sm:text-6xl md:text-7xl font-normal leading-none tracking-tight text-white mb-8">
-                  <span className="italic font-light">Insight</span>
-                </h2>
-
-                <p className="text-sm md:text-base text-forge-muted font-sans leading-[1.8] mb-10">
-                  Every decision is intentional, every extraction has purpose. We combine Gemini 2.5 Flash's reasoning with deterministic regex guards to distill complex statutory texts into indisputable obligations.
-                </p>
-
-                {/* Refined line slider indicator (From Screenshot 1) */}
-                <div className="flex items-center gap-3 py-6 border-t border-white/[0.06] mb-8">
-                  <div className="w-12 h-[1px] bg-white/20" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-forge-accent" />
-                  <div className="w-24 h-[1px] bg-white/10" />
-                  <span className="text-[10px] font-mono tracking-widest text-forge-muted/60 ml-2">
-                    VERIFIED
-                  </span>
-                </div>
-
-                <button
-                  onClick={onEnterApp}
-                  className="inline-flex items-center gap-3 px-7 py-3.5 border border-white/20 hover:border-forge-accent text-[11px] uppercase tracking-[0.25em] font-sans transition-all duration-300 hover:bg-forge-accent/10 group"
-                >
-                  <span>Open Active Console</span>
-                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                </button>
-              </RevealSection>
-            </div>
+          {/* Stat strip */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden border border-forge-border bg-forge-border max-w-3xl mx-auto">
+            {[
+              { value: <CountUp to={4} />, label: 'Trust controls' },
+              { value: <span>SHA-256</span>, label: 'Chained ledger' },
+              { value: <CountUp to={3} />, label: 'Triage states' },
+              { value: <CountUp to={0} />, label: 'Disk retention' },
+            ].map((s) => (
+              <div key={s.label} className="bg-forge-card px-4 py-5">
+                <div className="font-serif text-2xl text-forge-gold mb-1">{s.value}</div>
+                <div className="text-3xs uppercase tracking-[0.16em] text-forge-dim">{s.label}</div>
+              </div>
+            ))}
           </div>
         </div>
+
+        <button
+          onClick={() => scrollTo('problem')}
+          className="absolute bottom-7 left-1/2 -translate-x-1/2 text-forge-dim hover:text-forge-gold transition-colors animate-float"
+          aria-label="Scroll down"
+        >
+          <ChevronDown className="w-5 h-5" />
+        </button>
       </section>
 
-      {/* ─── OUR APPROACH SECTION (Screenshot 5 exact aesthetic with regulatory agency crests) ─── */}
-      <section id="approach" className="relative py-28 md:py-36 bg-[#08080a] border-t border-white/[0.04]">
-        <div className="max-w-7xl mx-auto px-6 md:px-12">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 items-start mb-20">
-            {/* Left Title: Our Approach To Every Build */}
-            <div className="lg:col-span-5">
-              <RevealSection>
-                <div className="text-[11px] uppercase tracking-[0.35em] text-forge-accent font-sans mb-4">
-                  01 / 03
-                </div>
-                <h2 className="font-serif text-4xl sm:text-5xl md:text-6xl font-normal leading-[1.05] tracking-tight text-white">
-                  Our Approach<br />
-                  <span className="italic font-light text-forge-cream">To Every Build</span>
-                </h2>
-              </RevealSection>
-            </div>
-
-            {/* Right Editorial Copy */}
-            <div className="lg:col-span-7">
-              <RevealSection delay="reveal-delay-1">
-                <p className="text-sm md:text-base text-forge-muted font-sans leading-[1.8] mb-8">
-                  We reject the prevailing industry model of treating regulatory compliance as a probabilistic guessing game. When millions in capital adequacy and regulatory fines are on the line, AI summaries alone are insufficient. Every extraction must have character-level provenance, verifiable statutory citations, and an immutable human-in-the-loop audit sign-off.
-                </p>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 pt-6 border-t border-white/[0.05]">
-                  <div>
-                    <span className="font-serif text-3xl text-white block mb-1">0.00%</span>
-                    <span className="text-[10px] uppercase tracking-[0.15em] text-forge-muted font-sans">
-                      PII Leak Tolerance
-                    </span>
-                  </div>
-                  <div>
-                    <span className="font-serif text-3xl text-white block mb-1">&lt;850ms</span>
-                    <span className="text-[10px] uppercase tracking-[0.15em] text-forge-muted font-sans">
-                      Extraction Latency
-                    </span>
-                  </div>
-                  <div>
-                    <span className="font-serif text-3xl text-white block mb-1">100%</span>
-                    <span className="text-[10px] uppercase tracking-[0.15em] text-forge-muted font-sans">
-                      Provenance Proof
-                    </span>
-                  </div>
-                </div>
-              </RevealSection>
-            </div>
-          </div>
-
-          {/* ─── LUXURY REGULATORY AUTHORITY CRESTS (Mirroring Ferrari, Lambo, Defender logos in Screenshot 5) ─── */}
-          <div className="pt-12 border-t border-white/[0.05]">
-            <p className="text-center text-[10px] uppercase tracking-[0.3em] text-forge-muted/40 font-sans mb-10">
-              Validated Across Global Regulatory Frameworks
-            </p>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-6 items-center justify-items-center opacity-70 hover:opacity-100 transition-opacity duration-500">
+      {/* ── MARQUEE ─────────────────────────────────────────── */}
+      <div className="border-y border-forge-border bg-forge-dark/60 py-4 overflow-hidden marquee-mask" style={{ borderColor: '#252a3a' }}>
+        <div className="marquee-track">
+          {[0, 1].map((copy) => (
+            <div key={copy} className="flex items-center shrink-0" aria-hidden={copy === 1}>
               {[
-                { name: 'SEC', subtitle: 'US Securities & Exchange' },
-                { name: 'FINRA', subtitle: 'Financial Regulatory' },
-                { name: 'CFTC', subtitle: 'Commodity Futures' },
-                { name: 'ESMA', subtitle: 'MiFID II Europe' },
-                { name: 'MAS', subtitle: 'Monetary Authority SG' },
-                { name: 'BaFin', subtitle: 'Federal Financial DE' },
-              ].map((crest) => (
-                <div
-                  key={crest.name}
-                  className="group flex flex-col items-center justify-center p-4 border border-white/[0.05] hover:border-forge-accent/40 w-full rounded-sm transition-all duration-300 hover:bg-white/[0.02]"
-                >
-                  <span className="font-serif text-xl md:text-2xl tracking-widest text-white/80 group-hover:text-forge-accent transition-colors">
-                    {crest.name}
-                  </span>
-                  <span className="text-[8px] uppercase tracking-[0.15em] text-forge-muted/60 mt-1 font-mono">
-                    {crest.subtitle}
-                  </span>
+                'SYNTHETIC CORPUS MODELLED ON FINRA NOTICES',
+                'SEC RULEMAKING FORMATS',
+                'GDPR ARTICLE 46 MEMORANDA',
+                'HIPAA SECURITY RULE UPDATES',
+                'BASEL III CAPITAL FRAMEWORKS',
+                'FinCEN BSA TRAVEL RULE',
+              ].map((label) => (
+                <span key={label} className="flex items-center gap-4 px-6 whitespace-nowrap">
+                  <span className="text-3xs uppercase tracking-[0.22em] text-forge-dim">{label}</span>
+                  <span className="w-1 h-1 rounded-full bg-forge-accent/50" />
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── PROBLEM ─────────────────────────────────────────── */}
+      <section id="problem" className="relative py-24 md:py-32 px-5">
+        <div className="max-w-6xl mx-auto">
+          <Reveal className="text-center max-w-3xl mx-auto mb-16">
+            <span className="eyebrow">The gap</span>
+            <h2 className="font-serif text-4xl md:text-5xl text-white mt-4 mb-6 leading-tight">
+              Compliance work happens.
+              <br />
+              <span className="italic text-forge-muted">The evidence does not.</span>
+            </h2>
+            <p className="text-forge-muted leading-relaxed">
+              A 40-page circular lands on a Monday. Someone reads it, someone decides what to do,
+              and by Friday nobody can reconstruct who decided what, on which page, and why.
+              That is the finding an auditor writes.
+            </p>
+          </Reveal>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            {[
+              {
+                icon: FileSearch,
+                title: 'Citations you cannot check',
+                body: 'An AI summary says "the firm must do X". Which page? Which clause? If you cannot point at the sentence, you cannot defend it.',
+                accent: 'coral',
+              },
+              {
+                icon: UserCheck,
+                title: 'Decisions with no author',
+                body: '"Approved" with no name, no timestamp, no reason. Maker-checker becomes a formality nobody can prove happened.',
+                accent: 'amber',
+              },
+              {
+                icon: ScrollText,
+                title: 'An audit trail you can edit',
+                body: 'If the record lives in a spreadsheet, anyone with write access can rewrite history. That is not an audit trail.',
+                accent: 'sky',
+              },
+            ].map((card, i) => (
+              <Reveal key={card.title} delay={`reveal-delay-${i + 1}`} variant="reveal-scale">
+                <div className="h-full p-7 rounded-lg bg-forge-card border border-forge-border card-glow transition-colors hover:border-forge-accent/30" style={{ borderColor: '#252a3a' }}>
+                  <card.icon className={`w-6 h-6 mb-5 text-${card.accent}`} style={{ color: card.accent === 'coral' ? '#ff7a90' : card.accent === 'amber' ? '#fbbf24' : '#6fa8ff' }} />
+                  <h3 className="font-serif text-xl text-forge-cream mb-3">{card.title}</h3>
+                  <p className="text-sm text-forge-muted leading-relaxed">{card.body}</p>
                 </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── HOW IT WORKS ────────────────────────────────────── */}
+      <section id="how" className="relative py-24 md:py-32 px-5 bg-forge-dark/40 border-y border-forge-border" style={{ borderColor: '#252a3a' }}>
+        <div className="max-w-6xl mx-auto">
+          <Reveal className="mb-16 max-w-2xl">
+            <span className="eyebrow">The pipeline</span>
+            <h2 className="font-serif text-4xl md:text-5xl text-white mt-4 leading-tight">
+              Six steps from PDF to <span className="italic text-gradient-gold">provable</span> decision
+            </h2>
+          </Reveal>
+
+          <div className="relative">
+            <div className="absolute left-[27px] top-3 bottom-3 w-px bg-gradient-to-b from-forge-accent/60 via-forge-border to-transparent hidden md:block" style={{ background: 'linear-gradient(180deg, rgba(232,180,100,0.6), #252a3a, transparent)' }} aria-hidden="true" />
+
+            <div className="space-y-4">
+              {[
+                { icon: Database, step: '01', title: 'Ingest in memory', body: 'The PDF is read into a buffer. It never touches disk, so there is no temp file to leak or forget.' },
+                { icon: Brain, step: '02', title: 'Extract with Gemini', body: 'The model returns obligations as strict JSON: summary, plain meaning, page, clause, tier, deadline, and declared scope.' },
+                { icon: Lock, step: '03', title: 'Scan for PII deterministically', body: 'After the model runs, a regex guard sweeps the output for 8 identifier patterns. The model\'s promise is never the last word.' },
+                { icon: FileSearch, step: '04', title: 'Verify every clause', body: 'Our own PDF text extractor checks the quoted sentence against the real document. Not found? The citation is removed, not dressed up.' },
+                { icon: ShieldCheck, step: '05', title: 'Triage to your scope', body: 'Each obligation is marked applies, out of scope, or unclear against the entity types you declared.' },
+                { icon: Link2, step: '06', title: 'Decide and seal', body: 'An administrator approves or rejects with a reason. The decision is hashed with the previous block: SHA-256, chained.' },
+              ].map((item, i) => (
+                <Reveal key={item.step} delay={`reveal-delay-${Math.min(i, 4)}`} variant="reveal-left">
+                  <div className="flex gap-5 items-start p-5 rounded-lg bg-forge-card/70 border border-forge-border hover:border-forge-accent/30 transition-colors" style={{ borderColor: '#252a3a' }}>
+                    <div className="relative shrink-0">
+                      <div className="w-14 h-14 rounded-lg bg-forge-raised border border-forge-border flex items-center justify-center" style={{ borderColor: '#252a3a' }}>
+                        <item.icon className="w-5 h-5 text-forge-accent" />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-3xs uppercase tracking-[0.2em] text-forge-dim mb-1">Step {item.step}</div>
+                      <h3 className="font-serif text-xl text-forge-cream mb-1.5">{item.title}</h3>
+                      <p className="text-sm text-forge-muted leading-relaxed">{item.body}</p>
+                    </div>
+                  </div>
+                </Reveal>
               ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* ─── INTERACTIVE LIVE SIMULATOR DIRECTLY ON LANDING PAGE ─── */}
-      <section className="relative py-28 md:py-36 bg-[#050505] border-t border-white/[0.04]">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <RevealSection>
-            <p className="text-[10px] uppercase tracking-[0.3em] text-forge-accent font-sans mb-4">
-              Real-Time Verification
-            </p>
-            <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-normal text-white mb-6">
-              Experience the <span className="italic font-light">Engine</span> in Action
+      {/* ── GOVERNANCE ──────────────────────────────────────── */}
+      <section id="governance" className="py-24 md:py-32 px-5">
+        <div className="max-w-6xl mx-auto">
+          <Reveal className="text-center max-w-2xl mx-auto mb-16">
+            <span className="eyebrow">Separation of duties</span>
+            <h2 className="font-serif text-4xl md:text-5xl text-white mt-4 mb-5 leading-tight">
+              Maker-checker, enforced by the server
             </h2>
-            <p className="text-xs md:text-sm text-forge-muted font-sans max-w-lg mx-auto mb-10 leading-relaxed">
-              Test how Apex processes incoming regulatory PDF streams: zero-disk buffer, AI extraction, PII scrub, and SHA-256 block commitment.
+            <p className="text-forge-muted leading-relaxed">
+              Not a UI hint. Not a disabled button that a crafted request can bypass.
+              The rule is checked in the route, in the controller, and the database keeps the name.
             </p>
+          </Reveal>
 
-            {/* Interactive Terminal Card */}
-            <div className="bg-[#0a0a0c] border border-white/[0.08] rounded-sm p-6 md:p-8 text-left font-mono text-xs shadow-2xl relative overflow-hidden">
-              <div className="flex items-center justify-between pb-4 border-b border-white/[0.06] mb-6">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
-                  <span className="text-[11px] text-forge-muted/60 ml-2">apex-pipeline-stream.log</span>
+          <div className="grid md:grid-cols-2 gap-5 mb-8">
+            <Reveal variant="reveal-left">
+              <div className="h-full p-7 rounded-lg bg-forge-card border-2 border-sky/25" style={{ borderColor: 'rgba(111,168,255,0.25)' }}>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-10 h-10 rounded-lg bg-sky/10 border border-sky/30 flex items-center justify-center">
+                    <FileSearch className="w-5 h-5 text-sky" style={{ color: '#6fa8ff' }} />
+                  </div>
+                  <div>
+                    <div className="text-3xs uppercase tracking-[0.2em] text-forge-dim">Maker</div>
+                    <h3 className="font-serif text-lg text-forge-cream">Researcher</h3>
+                  </div>
                 </div>
+                <ul className="space-y-2.5 text-sm">
+                  {[
+                    ['Ingest circulars', true],
+                    ['Read extracted obligations', true],
+                    ['Request clarification', true],
+                    ['Approve or reject', false],
+                  ].map(([label, allowed]) => (
+                    <li key={label} className="flex items-center gap-2.5">
+                      {allowed ? (
+                        <CheckCircle2 className="w-4 h-4 text-mint shrink-0" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-coral shrink-0" />
+                      )}
+                      <span className={allowed ? 'text-forge-text' : 'text-forge-dim line-through'}>{label}</span>
+                      {!allowed && <span className="ml-auto text-3xs font-mono text-coral">403</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Reveal>
 
+            <Reveal variant="reveal-right" delay="reveal-delay-1">
+              <div className="h-full p-7 rounded-lg bg-forge-card border-2 border-forge-accent/30" style={{ borderColor: 'rgba(232,180,100,0.3)' }}>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-10 h-10 rounded-lg bg-forge-accent/10 border border-forge-accent/30 flex items-center justify-center">
+                    <UserCheck className="w-5 h-5 text-forge-accent" />
+                  </div>
+                  <div>
+                    <div className="text-3xs uppercase tracking-[0.2em] text-forge-dim">Checker</div>
+                    <h3 className="font-serif text-lg text-forge-cream">Administrator</h3>
+                  </div>
+                </div>
+                <ul className="space-y-2.5 text-sm">
+                  {[
+                    ['Everything a researcher can do', true],
+                    ['Approve a finding', true],
+                    ['Reject with a mandatory reason', true],
+                    ['Promote another administrator', true],
+                  ].map(([label]) => (
+                    <li key={label} className="flex items-center gap-2.5">
+                      <CheckCircle2 className="w-4 h-4 text-forge-accent shrink-0" />
+                      <span className="text-forge-text">{label}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Reveal>
+          </div>
+
+          <Reveal>
+            <div className="p-5 rounded-lg bg-forge-raised/60 border border-forge-border flex items-start gap-3" style={{ borderColor: '#252a3a' }}>
+              <AlertTriangle className="w-5 h-5 text-amber shrink-0 mt-0.5" style={{ color: '#fbbf24' }} />
+              <p className="text-sm text-forge-muted leading-relaxed">
+                <span className="text-forge-text font-medium">Roles are never client-supplied.</span>{' '}
+                Registration ignores any role in the request body. In the full test suite,
+                <code className="mx-1.5 px-1.5 py-0.5 rounded bg-forge-black text-forge-gold text-xs font-mono">{"{\"role\":\"admin\"}"}</code>
+                still creates a researcher, and a researcher calling the approve endpoint gets a 403.
+              </p>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── OBLIGATION CARD PREVIEW ─────────────────────────── */}
+      <section className="py-24 md:py-32 px-5 bg-forge-dark/40 border-y border-forge-border" style={{ borderColor: '#252a3a' }}>
+        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
+          <Reveal variant="reveal-left">
+            <span className="eyebrow">What an obligation looks like</span>
+            <h2 className="font-serif text-4xl md:text-5xl text-white mt-4 mb-6 leading-tight">
+              Two layers.
+              <br />
+              <span className="italic text-forge-muted">Always.</span>
+            </h2>
+            <p className="text-forge-muted leading-relaxed mb-6">
+              A plain-language line you can forward to the business, and underneath it,
+              the exact sentence from the regulator with its page number. If the second layer
+              is missing, you are told why — never quietly handed a confident paraphrase.
+            </p>
+            <ul className="space-y-3 text-sm">
+              {[
+                'Clause text is verified against the PDF text layer',
+                'Unverifiable citations are withheld, not invented',
+                'Triage tells you whether it applies to your firm',
+                'Every finding exports as CSV and as a markdown audit pack',
+              ].map((t) => (
+                <li key={t} className="flex items-start gap-2.5 text-forge-muted">
+                  <CheckCircle2 className="w-4 h-4 text-mint shrink-0 mt-0.5" />
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </Reveal>
+
+          <Reveal variant="reveal-right" delay="reveal-delay-1">
+            <div className="rounded-lg bg-forge-card border border-forge-border p-6 shadow-lift" style={{ borderColor: '#252a3a' }}>
+              <div className="flex items-center justify-between pb-4 border-b border-forge-border mb-5" style={{ borderColor: '#252a3a' }}>
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-coral" />
+                  <span className="text-3xs uppercase tracking-[0.16em] text-forge-dim">MANDATORY</span>
+                </div>
+                <span className="text-3xs font-mono text-forge-dim">p. 4 · APPLIES</span>
+              </div>
+
+              <div className="mb-5">
+                <div className="text-3xs uppercase tracking-[0.18em] text-forge-accent mb-1.5">What this means</div>
+                <p className="text-sm text-forge-text leading-relaxed">
+                  Refresh the customer order-routing disclosure on the public portal every month,
+                  and keep the published copy as evidence.
+                </p>
+              </div>
+
+              <div className="p-4 rounded bg-forge-black border-l-2 border-forge-accent/60">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-3xs uppercase tracking-[0.16em] text-forge-dim">Clause · p.4</span>
+                  <span className="flex items-center gap-1 text-3xs font-mono text-mint">
+                    <Fingerprint className="w-3 h-3" /> verified
+                  </span>
+                </div>
+                <p className="font-serif italic text-sm text-forge-cream/90 leading-relaxed">
+                  “Member firms must update customer order routing disclosures on the public
+                  investor portal within 30 days of each calendar quarter.”
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between mt-5 pt-4 border-t border-forge-border text-3xs" style={{ borderColor: '#252a3a' }}>
+                <span className="text-forge-dim">Deadline · 30 days</span>
+                <span className="flex items-center gap-1.5 text-forge-dim">
+                  <Lock className="w-3 h-3" /> Awaiting administrator
+                </span>
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── PROOF ───────────────────────────────────────────── */}
+      <section id="proof" className="py-24 md:py-32 px-5">
+        <div className="max-w-6xl mx-auto">
+          <Reveal className="text-center max-w-2xl mx-auto mb-16">
+            <span className="eyebrow">Proof, not adjectives</span>
+            <h2 className="font-serif text-4xl md:text-5xl text-white mt-4 mb-5 leading-tight">
+              Every claim here has a
+              <br />
+              <span className="italic text-gradient-gold">way to be checked</span>
+            </h2>
+            <p className="text-forge-muted leading-relaxed">
+              Four controls, each enforced server-side, each with the test that proves it.
+            </p>
+          </Reveal>
+
+          <div className="grid sm:grid-cols-2 gap-5">
+            {[
+              {
+                icon: Server,
+                accent: '#a78bfa',
+                title: 'Server-assigned roles',
+                prove: 'Register with {"role":"admin"} → the account is a researcher.',
+                detail: 'The register handler ignores the field entirely and reads only the server-side ADMIN_EMAILS bootstrap.',
+              },
+              {
+                icon: UserCheck,
+                accent: '#6fa8ff',
+                title: 'Maker-checker approval',
+                prove: 'Researcher calls approve → 403. Admin rejects with no reason → 422.',
+                detail: 'Checked at the route (requireAdmin) and again in the controller, so neither layer alone is load-bearing.',
+              },
+              {
+                icon: Fingerprint,
+                accent: '#4ade9c',
+                title: 'Clause verification',
+                prove: 'A fabricated sentence is returned with its citation removed.',
+                detail: 'A dependency-free PDF text extractor compares the quote to the real document; a mismatch nulls the clause and the page.',
+              },
+              {
+                icon: Link2,
+                accent: '#e8b464',
+                title: 'Tamper-evident ledger',
+                prove: 'GET /api/research/audit/verify → valid: true, plus the block count.',
+                detail: 'Each decision hashes the previous block, the actor, the timestamp and the reason. Change one character and the chain breaks.',
+              },
+            ].map((c, i) => (
+              <Reveal key={c.title} delay={`reveal-delay-${i + 1}`} variant="reveal-scale">
+                <div className="h-full p-6 rounded-lg bg-forge-card border border-forge-border card-glow" style={{ borderColor: '#252a3a' }}>
+                  <c.icon className="w-5 h-5 mb-4" style={{ color: c.accent }} />
+                  <h3 className="font-serif text-lg text-forge-cream mb-2">{c.title}</h3>
+                  <p className="text-sm text-forge-muted leading-relaxed mb-4">{c.detail}</p>
+                  <div className="flex items-start gap-2 p-3 rounded bg-forge-black border border-forge-border" style={{ borderColor: '#252a3a' }}>
+                    <Terminal className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: c.accent }} />
+                    <span className="text-xs font-mono text-forge-muted leading-relaxed">{c.prove}</span>
+                  </div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── SIMULATION ──────────────────────────────────────── */}
+      <section className="py-24 md:py-32 px-5 bg-forge-dark/40 border-y border-forge-border" style={{ borderColor: '#252a3a' }}>
+        <div className="max-w-4xl mx-auto text-center">
+          <Reveal>
+            <span className="eyebrow">Watch the pipeline</span>
+            <h2 className="font-serif text-3xl md:text-4xl text-white mt-4 mb-4">
+              One circular, six stages
+            </h2>
+            <p className="text-forge-muted mb-10 max-w-xl mx-auto">
+              A walkthrough of what happens between dropping a PDF and an administrator signing off.
+            </p>
+          </Reveal>
+
+          <Reveal delay="reveal-delay-1">
+            <div className="text-left rounded-lg bg-forge-black border border-forge-border overflow-hidden" style={{ borderColor: '#252a3a' }}>
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-forge-border bg-forge-card" style={{ borderColor: '#252a3a' }}>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-coral/70" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber/70" style={{ backgroundColor: 'rgba(251,191,36,0.7)' }} />
+                  <span className="w-2.5 h-2.5 rounded-full bg-mint/70" />
+                  <span className="ml-2 text-2xs font-mono text-forge-dim">pipeline.log</span>
+                </div>
                 <button
                   onClick={runSimulation}
-                  disabled={isSimulating}
-                  className="px-4 py-1.5 border border-forge-accent/40 text-forge-accent hover:bg-forge-accent/10 text-[10px] uppercase tracking-wider transition-colors disabled:opacity-50"
+                  disabled={simRunning}
+                  className="px-3.5 py-1.5 rounded border border-forge-accent/40 text-forge-gold text-2xs uppercase tracking-[0.14em] hover:bg-forge-accent/10 transition-colors disabled:opacity-50"
                 >
-                  {isSimulating ? 'Processing...' : '▶ Run Ingestion Simulation'}
+                  {simRunning ? 'Running…' : 'Run walkthrough'}
                 </button>
               </div>
 
-              {/* Log stream outputs */}
-              <div className="space-y-3 min-h-[160px]">
+              <div className="p-5 space-y-2.5 font-mono text-xs min-h-[210px]">
                 {simStep === 0 && (
-                  <div className="text-forge-muted/50 italic">
-                    Press "Run Ingestion Simulation" to observe the sub-second compliance workflow...
-                  </div>
+                  <p className="text-forge-dim italic">
+                    Press “Run walkthrough” to see the six stages.
+                  </p>
                 )}
-                {simStep >= 1 && (
-                  <div className="text-forge-muted flex items-center gap-2 animate-fade-in">
-                    <span className="text-forge-accent">[00.12s]</span>
-                    <span>INGEST: Zero-disk memory buffer allocated for "SEC_Custody_Rule_2026.pdf" (612 KB)</span>
-                  </div>
-                )}
-                {simStep >= 2 && (
-                  <div className="text-sky-300 flex items-center gap-2 animate-fade-in">
-                    <span className="text-forge-accent">[00.45s]</span>
-                    <span>GEMINI 2.5: Parsed 3 binding mandates, 2 reporting deadlines, 1 high-severity vector.</span>
-                  </div>
-                )}
-                {simStep >= 3 && (
-                  <div className="text-emerald-400 flex items-center gap-2 animate-fade-in">
-                    <span className="text-forge-accent">[00.78s]</span>
-                    <span>REDACT: 2 SSNs & 1 personal email masked via deterministic regex guardrail. Residual: 0.</span>
-                  </div>
-                )}
-                {simStep >= 4 && (
-                  <div className="text-amber-300 flex items-center gap-2 animate-fade-in">
-                    <span className="text-forge-accent">[00.91s]</span>
-                    <span>LEDGER: Minted block #104. SHA-256: 4a3e91f09b8c... Waiting for Human-in-the-Loop Sign-off.</span>
-                  </div>
-                )}
-                {simStep >= 5 && (
-                  <div className="text-forge-cream pt-2 border-t border-white/[0.05] flex items-center justify-between font-bold animate-fade-in">
-                    <span>STATUS: READY FOR AUDIT APPROVAL</span>
-                    <button onClick={onEnterApp} className="text-forge-accent underline text-xs font-sans tracking-wider">
-                      Review in Console →
+                {[
+                  ['01', 'INGEST', 'PDF read into memory (612 KB). No file written to disk.', 'text-forge-muted'],
+                  ['02', 'EXTRACT', 'Gemini returns 3 obligations with page, clause, tier and scope.', 'text-sky'],
+                  ['03', 'PII', 'Deterministic scan finds 1 SSN and 1 email. Both replaced. Residual: 0.', 'text-mint'],
+                  ['04', 'VERIFY', '2 clauses matched the PDF text. 1 fabricated quote had its citation withheld.', 'text-forge-gold'],
+                  ['05', 'TRIAGE', '2 marked APPLIES for your entity type, 1 OUT_OF_SCOPE.', 'text-violet'],
+                  ['06', 'DECIDE', 'Administrator rejects with a reason. Block sealed. Ledger valid: true.', 'text-forge-cream'],
+                ].map(([n, stage, text, color], i) => (
+                  simStep > i && (
+                    <div key={n} className="flex items-start gap-3 animate-fade-in">
+                      <span className="text-forge-dim shrink-0">{n}</span>
+                      <span className="shrink-0 w-16" style={{ color: 'inherit' }}>
+                        <span className={color}>{stage}</span>
+                      </span>
+                      <span className="text-forge-muted leading-relaxed">{text}</span>
+                    </div>
+                  )
+                ))}
+                {simStep >= 6 && (
+                  <div className="pt-3 mt-2 border-t border-forge-border flex items-center justify-between" style={{ borderColor: '#252a3a' }}>
+                    <span className="text-mint font-semibold">PIPELINE COMPLETE · HUMAN DECISION RECORDED</span>
+                    <button onClick={onEnterApp} className="text-forge-gold hover:underline text-xs">
+                      Open console →
                     </button>
                   </div>
                 )}
               </div>
             </div>
-          </RevealSection>
+          </Reveal>
+
+          <p className="text-3xs text-forge-dim mt-4">
+            Illustrative walkthrough of the pipeline stages — not a recording of a live request.
+          </p>
         </div>
       </section>
 
-      {/* ─── FINAL EDITORIAL CALL TO ACTION ─── */}
-      <section className="relative py-32 md:py-44 bg-[#050505] text-center px-6">
-        <RevealSection className="max-w-3xl mx-auto">
-          <p className="text-[10px] uppercase tracking-[0.35em] text-forge-accent font-sans mb-6">
-            Command Your Compliance
-          </p>
-          <h2 className="font-serif text-4xl sm:text-5xl md:text-6xl font-normal leading-[1.1] text-white mb-10">
-            Engineered For Those Who<br />
-            <span className="italic font-light text-forge-cream">Cannot Afford Failure</span>
-          </h2>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <button
-              onClick={onEnterApp}
-              className="w-full sm:w-auto px-10 py-5 bg-white text-black hover:bg-forge-cream font-sans text-[11px] uppercase tracking-[0.25em] font-semibold transition-all duration-300 shadow-2xl hover:scale-105"
-            >
-              Enter Research Console
-            </button>
+      {/* ── CAPABILITIES ────────────────────────────────────── */}
+      <section className="py-24 md:py-28 px-5">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[
+              { icon: Download, title: 'Audit pack export', body: 'One markdown bundle: obligations, clauses, pages, actor, timestamp, reason, chain status, and a SHA-256 of the pack.' },
+              { icon: ScrollText, title: 'Obligation CSV', body: 'The same findings as a spreadsheet, for the people who live in spreadsheets.' },
+              { icon: Layers2Icon, title: 'Version diff', body: 'Compare two circulars and see what was added, removed and reworded.' },
+              { icon: Sparkles, title: 'Plain-language layer', body: 'Every obligation carries a one-line meaning you can forward without a translation call.' },
+            ].map((c, i) => (
+              <Reveal key={c.title} delay={`reveal-delay-${i + 1}`}>
+                <div className="h-full p-6 rounded-lg bg-forge-card/60 border border-forge-border hover:border-forge-accent/30 transition-colors" style={{ borderColor: '#252a3a' }}>
+                  <c.icon className="w-5 h-5 text-forge-accent mb-4" />
+                  <h3 className="text-base font-medium text-forge-cream mb-2">{c.title}</h3>
+                  <p className="text-xs text-forge-muted leading-relaxed">{c.body}</p>
+                </div>
+              </Reveal>
+            ))}
           </div>
-        </RevealSection>
+        </div>
       </section>
 
-      {/* ─── FOOTER ─── */}
-      <footer className="border-t border-white/[0.05] bg-[#030304] py-12 px-6">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] uppercase tracking-[0.2em] text-forge-muted/50 font-sans">
-          <div className="flex items-center gap-3">
-            <div className="w-5 h-5 border border-forge-accent/40 rounded flex items-center justify-center">
-              <span className="text-forge-accent font-serif text-[10px]">§</span>
-            </div>
-            <span className="text-white/80 font-serif tracking-widest">Apex Regulatory Intelligence</span>
+      {/* ── CLOSING (centered hero) ─────────────────────────── */}
+      <section className="relative py-28 md:py-40 px-5 text-center overflow-hidden">
+        <div className="absolute inset-0 bg-texture" />
+        <div
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[700px] h-[380px] rounded-full blur-[140px] pointer-events-none"
+          style={{ background: 'radial-gradient(circle, rgba(232,180,100,0.13), transparent 70%)' }}
+          aria-hidden="true"
+        />
+        <Reveal className="relative z-10 max-w-3xl mx-auto">
+          <span className="eyebrow">Close the gap</span>
+          <h2 className="font-serif text-5xl sm:text-6xl md:text-7xl text-white mt-6 mb-8 leading-[1.05]">
+            Prove it.
+            <br />
+            <span className="italic text-gradient-gold">Every control. Every time.</span>
+          </h2>
+          <p className="text-forge-muted max-w-xl mx-auto mb-10 leading-relaxed">
+            Bring a circular. We will show you the obligation, the page, the person who decided,
+            and the hash that proves nobody edited it afterwards.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button onClick={onEnterApp} className="btn-primary w-full sm:w-auto">
+              {isAuthenticated ? 'Enter the console' : 'Open the console'}
+              <ArrowRight className="w-4 h-4" />
+            </button>
+            <button onClick={() => scrollTo('proof')} className="btn-ghost w-full sm:w-auto">
+              Review the controls
+            </button>
+          </div>
+        </Reveal>
+      </section>
+
+      {/* ── FOOTER ──────────────────────────────────────────── */}
+      <footer className="border-t border-forge-border bg-forge-dark/60 px-5 py-10" style={{ borderColor: '#252a3a' }}>
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-5 text-2xs text-forge-dim">
+          <div className="flex items-center gap-2.5">
+            <span className="w-6 h-6 rounded border border-forge-accent/40 flex items-center justify-center">
+              <span className="text-forge-accent font-serif text-xs">§</span>
+            </span>
+            <span className="font-serif text-forge-cream text-sm">RegTech Intelligence</span>
           </div>
 
-          <div className="flex items-center gap-6">
-            <span>FIPS 140-3 Compliant</span>
-            <span className="w-1 h-1 rounded-full bg-forge-muted/30" />
-            <span>Zero-Disk Buffer</span>
-            <span className="w-1 h-1 rounded-full bg-forge-muted/30" />
-            <span>SHA-256 Audit Trail</span>
-          </div>
+          <p className="text-center max-w-md leading-relaxed">
+            Demonstration product. Uses a synthetic test corpus modelled on FINRA / SEC / GDPR /
+            HIPAA / Basel III / FinCEN formats. Not legal advice.
+          </p>
 
-          <div>
-            © 2026 Apex RegTech. All Rights Reserved.
+          <div className="flex items-center gap-4">
+            <span>© 2026</span>
+            <button onClick={onEnterApp} className="hover:text-forge-gold transition-colors underline underline-offset-4 decoration-forge-accent/40">
+              Console
+            </button>
           </div>
         </div>
       </footer>
     </div>
+  );
+}
+
+/* small icon alias used above */
+function Layers2Icon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="m12 2 9 5-9 5-9-5 9-5Z" />
+      <path d="m3 12 9 5 9-5" />
+      <path d="m3 17 9 5 9-5" />
+    </svg>
   );
 }
