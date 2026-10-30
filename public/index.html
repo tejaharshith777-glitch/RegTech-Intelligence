@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Regulatory Compliance Platform - Interactive Verification Console</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(18, 26, 43, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.35);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #f3f4f6;
+      --text-muted: #94a3b8;
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(circle at 10% 20%, #0d1527 0%, #060911 90%);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 24px 36px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(9, 13, 22, 0.85);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 20px;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    .brand h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.12);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+    }
+
+    main {
+      flex: 1;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 36px;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 28px;
+    }
+
+    @media (max-width: 960px) {
+      main { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 24px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .panel-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #fff;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    input, select, textarea {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--card-border);
+      padding: 12px 14px;
+      border-radius: 8px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    button {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+      border: none;
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    button:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px var(--accent-glow);
+    }
+
+    button.secondary {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+    }
+
+    button.secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .drop-zone {
+      border: 2px dashed rgba(59, 130, 246, 0.4);
+      background: rgba(59, 130, 246, 0.03);
+      padding: 28px 16px;
+      border-radius: 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .drop-zone:hover {
+      border-color: var(--accent);
+      background: rgba(59, 130, 246, 0.08);
+    }
+
+    .card {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 18px;
+      margin-bottom: 16px;
+      transition: all 0.2s;
+    }
+
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.16);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .tag {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      text-transform: uppercase;
+    }
+
+    .tag-high { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .tag-medium { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .tag-low { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+
+    .tag-pending { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+    .tag-approved { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+    .tag-rejected { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+
+    .bullet-list {
+      list-style-type: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .bullet-list li {
+      font-size: 0.88rem;
+      line-height: 1.5;
+      color: #e2e8f0;
+      padding-left: 20px;
+      position: relative;
+    }
+
+    .bullet-list li::before {
+      content: "•";
+      color: var(--accent);
+      position: absolute;
+      left: 6px;
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--card-border);
+    }
+
+    .btn-approve {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      padding: 8px 16px;
+      font-size: 0.82rem;
+    }
+
+    .btn-approve:hover {
+      background: #10b981;
+      color: white;
+    }
+
+    .btn-reject {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      padding: 8px 16px;
+      font-size: 0.82rem;
+    }
+
+    .btn-reject:hover {
+      background: #ef4444;
+      color: white;
+    }
+
+    .console-logs {
+      background: #000;
+      border-radius: 10px;
+      padding: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: #a7f3d0;
+      height: 220px;
+      overflow-y: auto;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .log-entry { margin-bottom: 4px; }
+    .log-time { color: #64748b; }
+    .log-err { color: #f87171; }
+    .log-warn { color: #fbbf24; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">§</div>
+      <div>
+        <h1>Regulatory Compliance Platform</h1>
+        <p>Gemini AI Engine · PII Guardrail · Human-in-the-Loop Hub</p>
+      </div>
+    </div>
+    <div class="badge">
+      <div class="badge-dot"></div>
+      <span id="system-status">API Server Active</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left Column: Controls & Actions -->
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+
+      <!-- Auth Card -->
+      <div class="panel">
+        <div class="panel-title">
+          <span>👤 Authentication Control</span>
+        </div>
+        <div class="form-group">
+          <label>Active Role</label>
+          <select id="user-role" onchange="autoLogin()">
+            <option value="researcher">Compliance Researcher</option>
+            <option value="admin">Chief Compliance Officer (Admin)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Bearer Token</label>
+          <input type="text" id="jwt-token" readonly placeholder="Generating authentication token...">
+        </div>
+        <button class="secondary" onclick="autoLogin()">↻ Refresh Token</button>
+      </div>
+
+      <!-- Upload PDF Card -->
+      <div class="panel">
+        <div class="panel-title">
+          <span>📄 Upload Regulatory Document</span>
+        </div>
+        <div class="drop-zone" onclick="document.getElementById('file-input').click()">
+          <div style="font-size: 28px; margin-bottom: 8px;">📑</div>
+          <div style="font-weight: 600; font-size: 0.9rem;" id="selected-file-label">Click to select PDF</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Max 15MB · PDF only</div>
+          <input type="file" id="file-input" accept="application/pdf" style="display: none;" onchange="handleFileSelect(event)">
+        </div>
+
+        <button id="upload-btn" onclick="uploadDocument()" disabled>
+          <span>🚀 Analyze with Gemini AI</span>
+        </button>
+
+        <button class="secondary" onclick="uploadSamplePdf()">
+          <span>⚡ Try Pre-loaded Regulatory Sample</span>
+        </button>
+      </div>
+
+      <!-- Live Terminal / Audit Logs -->
+      <div class="panel">
+        <div class="panel-title">
+          <span>📟 Platform Audit Logs</span>
+        </div>
+        <div class="console-logs" id="logs">
+          <div class="log-entry"><span class="log-time">[System]</span> Interactive UI initialized.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Human-in-the-Loop Dashboard -->
+    <div class="panel" style="min-height: 600px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="panel-title">
+          <span>📋 Compliance Review Dashboard (HITL)</span>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <select id="status-filter" onchange="loadInsights()" style="padding: 6px 12px; font-size: 0.8rem;">
+            <option value="">All Statuses</option>
+            <option value="Pending">Pending Review</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+          <button class="secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="loadInsights()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div id="insights-container" style="display: flex; flex-direction: column; gap: 14px; margin-top: 12px;">
+        <div style="text-align: center; color: var(--text-muted); padding: 40px;">Loading extracted compliance insights...</div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let currentToken = '';
+    let selectedFile = null;
+
+    function log(msg, type = 'info') {
+      const logs = document.getElementById('logs');
+      const time = new Date().toLocaleTimeString();
+      const div = document.createElement('div');
+      div.className = 'log-entry ' + (type === 'err' ? 'log-err' : (type === 'warn' ? 'log-warn' : ''));
+      div.innerHTML = `<span class="log-time">[${time}]</span> ${msg}`;
+      logs.appendChild(div);
+      logs.scrollTop = logs.scrollHeight;
+    }
+
+    async function autoLogin() {
+      const role = document.getElementById('user-role').value;
+      const email = role === 'admin' ? 'admin@compliance.org' : 'researcher@compliance.org';
+      const password = 'SecurePassword123!';
+      const username = role === 'admin' ? 'ComplianceAdmin' : 'ComplianceResearcher';
+
+      log(`Authenticating session as ${role}...`);
+
+      try {
+        // Attempt login
+        let res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        // Register if user doesn't exist
+        if (!res.ok) {
+          res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, email, password, role })
+          });
+        }
+
+        const data = await res.json();
+        if (data.data?.token) {
+          currentToken = data.data.token;
+          document.getElementById('jwt-token').value = currentToken;
+          log(`Authenticated successfully! Role: ${role}`, 'info');
+          loadInsights();
+        } else {
+          log('Auth failed: ' + (data.message || 'Unknown'), 'err');
+        }
+      } catch (e) {
+        log('Auth network error: ' + e.message, 'err');
+      }
+    }
+
+    function handleFileSelect(e) {
+      if (e.target.files && e.target.files[0]) {
+        selectedFile = e.target.files[0];
+        document.getElementById('selected-file-label').innerText = selectedFile.name;
+        document.getElementById('upload-btn').disabled = false;
+        log(`PDF selected: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(1)} KB)`);
+      }
+    }
+
+    async function uploadDocument() {
+      if (!selectedFile) return;
+
+      const btn = document.getElementById('upload-btn');
+      btn.disabled = true;
+      btn.innerText = 'Analyzing with Gemini AI...';
+      log(`Uploading ${selectedFile.name} & requesting Gemini compliance audit...`);
+
+      const formData = new FormData();
+      formData.append('document', selectedFile);
+
+      try {
+        const res = await fetch('/api/research/upload', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${currentToken}` },
+          body: formData
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          log(`Analysis successful! Document ID: ${data.data.document.id}`);
+          log(`Risk Level: ${data.data.insight.riskLevel} | PII Redacted: ${data.data.insight.piiRedacted}`);
+          loadInsights();
+        } else {
+          log(`Upload error: ${data.message}`, 'err');
+        }
+      } catch (e) {
+        log(`Upload failed: ${e.message}`, 'err');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>🚀 Analyze with Gemini AI</span>';
+      }
+    }
+
+    async function uploadSamplePdf() {
+      const samplePdfContent = `%PDF-1.4
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> endobj
+4 0 obj << /Length 260 >> stream
+BT
+/F1 12 Tf
+72 712 Td
+(FINANCIAL STABILITY REGULATION DIRECTIVE 2026-A) Tj
+0 -20 Td
+(Primary Auditor: Arthur Dent, Email: adent@galaxy.gov, SSN: 999-12-8877) Tj
+0 -20 Td
+(Policy Change: Liquidity coverage ratio requirement increased from 100% to 125% for Tier-1 banks.) Tj
+0 -20 Td
+(Policy Change: Unaudited foreign holdings disclosures must be published quarterly.) Tj
+ET
+endstream endobj
+xref
+0 5
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000214 00000 n 
+trailer << /Root 1 0 R /Size 5 >>
+startxref
+525
+%%EOF`;
+
+      const blob = new Blob([samplePdfContent], { type: 'application/pdf' });
+      selectedFile = new File([blob], 'SEC_Liquidity_Directive_2026.pdf', { type: 'application/pdf' });
+      document.getElementById('selected-file-label').innerText = selectedFile.name;
+      document.getElementById('upload-btn').disabled = false;
+      log('Loaded synthetic regulatory policy with embedded PII.');
+      uploadDocument();
+    }
+
+    async function loadInsights() {
+      const container = document.getElementById('insights-container');
+      const filter = document.getElementById('status-filter').value;
+      const url = '/api/research/insights' + (filter ? `?status=${filter}` : '');
+
+      try {
+        const res = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          container.innerHTML = `<div style="color: #f87171; padding: 20px;">${data.message || 'Error fetching records'}</div>`;
+          return;
+        }
+
+        const insights = data.data?.insights || [];
+        if (insights.length === 0) {
+          container.innerHTML = `
+            <div style="text-align: center; color: var(--text-muted); padding: 60px 20px;">
+              <div style="font-size: 32px; margin-bottom: 8px;">📭</div>
+              <div>No compliance insights found.</div>
+              <div style="font-size: 0.8rem; margin-top: 4px;">Click <b>"Try Pre-loaded Regulatory Sample"</b> to generate your first review!</div>
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = insights.map(item => `
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <strong style="font-size: 0.95rem;">${item.documentId?.filename || 'Regulatory Document'}</strong>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+                  Insight ID: <span style="font-family: monospace;">${item._id}</span>
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span class="tag tag-${(item.riskLevel || 'low').toLowerCase()}">${item.riskLevel} Risk</span>
+                <span class="tag tag-${(item.humanApprovalStatus || 'pending').toLowerCase()}">${item.humanApprovalStatus}</span>
+              </div>
+            </div>
+
+            <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; gap: 16px; margin-bottom: 8px;">
+              <span>🛡️ PII Guardrail: <b style="color: ${item.piiRedacted ? '#34d399' : '#94a3b8'}">${item.piiRedacted ? 'REDACTED' : 'None Detected'}</b></span>
+            </div>
+
+            <ul class="bullet-list">
+              ${(item.policyChangeSummary || []).map(p => `<li>${p}</li>`).join('')}
+            </ul>
+
+            ${item.humanApprovalStatus === 'Pending' ? `
+              <div class="card-actions">
+                <button class="btn-approve" onclick="updateApproval('${item._id}', 'Approved')">✔ Approve Policy</button>
+                <button class="btn-reject" onclick="updateApproval('${item._id}', 'Rejected')">✖ Reject</button>
+              </div>
+            ` : `
+              <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 8px; font-style: italic;">
+                Finalized as <b>${item.humanApprovalStatus}</b>. (Modification locked by audit guardrail)
+              </div>
+            `}
+          </div>
+        `).join('');
+
+      } catch (e) {
+        container.innerHTML = `<div style="color: #f87171; padding: 20px;">Failed to load insights: ${e.message}</div>`;
+      }
+    }
+
+    async function updateApproval(id, status) {
+      log(`Submitting human-in-the-loop decision: ${status} for ${id}...`);
+      try {
+        const res = await fetch(`/api/research/insights/${id}/approve`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${currentToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ humanApprovalStatus: status })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          log(`Insight ${id} successfully updated to ${status}!`, 'info');
+          loadInsights();
+        } else {
+          log(`Failed to update insight: ${data.message}`, 'err');
+        }
+      } catch (e) {
+        log(`Update error: ${e.message}`, 'err');
+      }
+    }
+
+    // Auto-bootstrap on page load
+    autoLogin();
+  </script>
+</body>
+</html>
