@@ -2,7 +2,7 @@
 
 const mongoose = require('mongoose');
 const crypto = require('crypto');
-const { getGeminiClient } = require('../config/gemini');
+const { getGeminiClient, listAvailableModels, generateWithRest } = require('../config/gemini');
 const Document = require('../models/Document.model');
 const Insight = require('../models/Insight.model');
 const { redactPolicyChanges } = require('../utils/piiGuard');
@@ -309,16 +309,47 @@ const uploadDocument = async (req, res, next) => {
         `text layer ${extracted.usable ? 'found' : 'NOT found (scanned?)'}`
     );
 
-    const candidateModels = [
-      'gemini-2.5-flash',
-      'gemini-2.5-pro',
-      'gemini-flash-latest',
-      'gemini-pro-latest',
-    ];
-
     stage = 'init-gemini';
     const geminiClient = getGeminiClient();
     let geminiResult = null;
+    let usedModelName = null;
+    let lastError = null;
+
+    // Preferred first, then whatever this API key can actually see. Google
+    // retires model names regularly (2.5-pro is already closed to new keys),
+    // so the list is discovered at runtime instead of trusted forever.
+    const PREFERRED_MODELS = [
+      'gemini-flash-latest',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-pro-latest',
+    ];
+
+    const score = (name) => {
+      let sc = 0;
+      if (/flash/i.test(name)) sc += 10;
+      if (/latest/i.test(name)) sc += 5;
+      if (/preview|exp/i.test(name)) sc -= 2;
+      if (/pro/i.test(name)) sc -= 1;
+      if (/thinking/i.test(name)) sc -= 6;
+      return sc;
+    };
+
+    const discovered = (await listAvailableModels()).slice().sort((a, b) => score(b) - score(a));
+    // Discovered models are known to exist for this key, so they go first;
+    // PREFERRED_MODELS is only a backstop for when ListModels itself fails.
+    const candidateModels = [...new Set([...discovered, ...PREFERRED_MODELS])].slice(0, 12);
+
+    /**
+     * A model that is missing, retired, renamed or over quota must never abort
+     * the whole upload — only a genuine content error should stop us.
+     */
+    const isAvailabilityError = (err) => {
+      const m = String(err?.message || '');
+      // Deliberately narrow: model-availability / capacity failures only.
+      // A bad prompt or a missing API key must fail fast, not burn 4 models.
+      return /429|\b50[023]\b|quota|rate limit|high demand|not found|no longer available|deprecated|invalid model|unknown model|resource_exhausted|overloaded|does not exist/i.test(m);
+    };
 
     stage = 'gemini';
     for (const modelName of candidateModels) {
@@ -333,27 +364,48 @@ const uploadDocument = async (req, res, next) => {
         });
 
         geminiResult = await model.generateContent([buildGeminiPrompt(), pdfPart]);
+        usedModelName = modelName;
         break; // Succeeded
       } catch (err) {
-        const isQuotaOrTransient =
-          err.message?.includes('429') ||
-          err.message?.includes('503') ||
-          err.message?.includes('quota') ||
-          err.message?.includes('high demand') ||
-          err.message?.includes('not found') ||
-          err.message?.includes('is not supported');
-
-        if (isQuotaOrTransient) {
-          console.warn(`[research] ⚠️  Model ${modelName} unavailable (${err.message?.slice(0, 80)}). Cascading...`);
+        lastError = err;
+        if (isAvailabilityError(err)) {
+          console.warn(`[research] ⚠️  ${modelName} unavailable: ${String(err.message).slice(0, 110)}`);
           continue;
         }
         throw err;
       }
     }
 
+    // ── Second route: the same models, called directly over REST ────────────
+    // Protects against a stale SDK, not a stale model list.
     if (!geminiResult) {
-      throw new Error('All AI candidate models exhausted their capacity. Please try again shortly.');
+      console.warn('[research] SDK route exhausted; falling back to the REST endpoint...');
+      for (const modelName of candidateModels) {
+        try {
+          const { text } = await generateWithRest({
+            model: modelName,
+            prompt: buildGeminiPrompt(),
+            pdfBase64: pdfPart.inlineData.data,
+          });
+          geminiResult = { response: { text: () => text } };
+          usedModelName = `${modelName} (REST)`;
+          break;
+        } catch (err) {
+          lastError = err;
+          console.warn(`[research] ⚠️  REST ${modelName} failed: ${String(err.message).slice(0, 110)}`);
+        }
+      }
     }
+
+    if (!geminiResult) {
+      // Give the caller something actionable instead of a bare 500.
+      const detail = String(lastError?.message || 'no model responded').slice(0, 240);
+      const err = new Error(`No Gemini model could be used with this API key. Last error: ${detail}`);
+      err.statusCode = 503;
+      throw err;
+    }
+
+    console.log(`[research] ✅ Extraction used model: ${usedModelName}`);
 
     stage = 'parse';
     const rawResponseText = geminiResult.response.text();

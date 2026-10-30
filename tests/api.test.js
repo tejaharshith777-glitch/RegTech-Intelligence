@@ -68,7 +68,11 @@ require.cache[require.resolve('../config/gemini')] = {
   id: require.resolve('../config/gemini'),
   filename: require.resolve('../config/gemini'),
   loaded: true,
-  exports: { getGeminiClient: () => geminiStub },
+  exports: {
+    getGeminiClient: () => geminiStub,
+    // Model discovery is a network call; the suite stubs it out.
+    listAvailableModels: async () => ['gemini-test-flash'],
+  },
 };
 
 // ── Database bootstrap ──────────────────────────────────────────────────────
